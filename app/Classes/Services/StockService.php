@@ -26,6 +26,7 @@ class StockService implements StockProviderContract
         $stock = StockItem::query()
             ->where('branch_id', $branchId)
             ->where('medication_id', $itemId)
+            ->lockForUpdate()
             ->first();
 
         if (! $stock || $stock->quantity_on_hand < $quantity) {

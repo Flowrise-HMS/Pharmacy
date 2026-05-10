@@ -2,6 +2,7 @@
 
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Pages;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -30,10 +31,11 @@ class PharmacyPos extends Page implements HasActions, HasTable
 {
     use InteractsWithActions;
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string $layout = 'filament-panels::components.layout.base';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = -2;
 
     protected Width|string|null $maxContentWidth = 'full';
 
