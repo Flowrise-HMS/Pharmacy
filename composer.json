@@ -1,0 +1,31 @@
+{
+    "name": "flowrise-hms/pharmacy",
+    "type": "laravel-module",
+    "description": "Lean pharmacy module for medication catalog, stock, ordering, and dispensing.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "flowrise-hms/core": "dev-main",
+        "flowrise-hms/patient": "dev-main"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Pharmacy\\": "app/",
+            "Modules\\Pharmacy\\Database\\Factories\\": "database/factories/",
+            "Modules\\Pharmacy\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Pharmacy\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

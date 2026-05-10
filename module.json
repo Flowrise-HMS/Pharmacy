@@ -1,0 +1,16 @@
+{
+    "name": "Pharmacy",
+    "alias": "pharmacy",
+    "description": "Lean pharmacy workflows for medications, stock, and dispensing integrated with Clinical orders.",
+    "keywords": ["hms", "hospital", "pharmacy", "medication", "dispense", "inventory"],
+    "priority": 30,
+    "providers": [
+        "Modules\\Pharmacy\\Providers\\PharmacyServiceProvider"
+    ],
+    "files": [],
+    "requires": [
+        "Modules\\Core",
+        "Modules\\Clinical",
+        "Modules\\Patient"
+    ]
+}
