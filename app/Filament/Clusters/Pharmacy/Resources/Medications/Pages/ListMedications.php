@@ -8,4 +8,14 @@ use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Medication
 class ListMedications extends ListRecords
 {
     protected static string $resource = MedicationResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\ImportAction::make()
+                ->importer(\Modules\Pharmacy\Filament\Imports\MedicationImporter::class)
+                ->color('info'),
+            \Filament\Actions\CreateAction::make(),
+        ];
+    }
 }

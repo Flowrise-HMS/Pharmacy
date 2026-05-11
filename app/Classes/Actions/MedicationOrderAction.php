@@ -6,10 +6,13 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
+use Modules\Pharmacy\Classes\Services\MedicationService;
+use Modules\Pharmacy\Classes\Services\RxNormService;
 
 class MedicationOrderAction
 {
@@ -26,11 +29,54 @@ class MedicationOrderAction
                         Select::make('service_id')
                             ->label('Medication Service')
                             ->required()
-                            ->options(function () {
-                                return Service::query()
+                            ->searchable()
+                            ->live()
+                            ->getSearchResultsUsing(function (string $search) {
+                                $localServices = Service::query()
                                     ->whereHas('category', fn ($q) => $q->where('code', 'MED'))
+                                    ->where('name', 'like', "%{$search}%")
+                                    ->limit(10)
                                     ->pluck('name', 'id')
                                     ->toArray();
+
+                                $rxNormService = app(RxNormService::class);
+                                $externalResults = $rxNormService->search($search);
+
+                                $externalFormatted = [];
+                                foreach (array_slice($externalResults, 0, 10) as $external) {
+                                    $externalFormatted['rxnorm:' . $external['rxcui'] . ':' . $external['name']] = '[External] ' . $external['name'];
+                                }
+
+                                return $localServices + $externalFormatted;
+                            })
+                            ->getOptionLabelUsing(function ($value): ?string {
+                                if (str_starts_with($value, 'rxnorm:')) {
+                                    $parts = explode(':', $value, 3);
+                                    return isset($parts[2]) ? '[External] ' . $parts[2] : $value;
+                                }
+                                return Service::find($value)?->name;
+                            })
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                if (str_starts_with($state, 'rxnorm:')) {
+                                    $parts = explode(':', $state, 3);
+                                    $rxcui = $parts[1] ?? null;
+                                    $name = $parts[2] ?? 'Unknown Medication';
+
+                                    // Materialize it in the local DB
+                                    $medicationService = app(MedicationService::class);
+                                    $medication = $medicationService->createWithService([
+                                        'rxnorm_code' => $rxcui,
+                                        'generic_name' => $name,
+                                        'service_name' => $name,
+                                        'price' => 0, // Needs pricing by pharmacy later
+                                        'is_active' => true,
+                                        'requires_prescription' => true,
+                                        'dosage_form' => 'tablet', // Default fallback
+                                    ]);
+
+                                    // Set the newly created local service_id
+                                    $set('service_id', $medication->service_id);
+                                }
                             }),
                         TextInput::make('quantity')
                             ->numeric()
