@@ -6,7 +6,9 @@ use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Illuminate\Support\Number;
+use Illuminate\Support\Str;
 use Modules\Pharmacy\Classes\Services\MedicationService;
+use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
 
@@ -113,6 +115,8 @@ class MedicationImporter extends Importer
                 'reorder_quantity' => 50,
             ])->increment('quantity_on_hand', (int) $data['initial_stock_quantity']);
         }
+
+        $this->upsertDrugReference($data);
     }
 
     public static function getCompletedNotificationBody(Import $import): string
@@ -124,5 +128,49 @@ class MedicationImporter extends Importer
         }
 
         return $body;
+    }
+
+    protected function upsertDrugReference(array $data): void
+    {
+        if (blank($data['generic_name'] ?? null)) {
+            return;
+        }
+
+        Drug::query()->updateOrCreate(
+            [
+                'source_provider' => 'local',
+                'source_identifier' => $this->resolveDrugSourceIdentifier($data),
+            ],
+            [
+                'rxnorm_code' => $data['rxnorm_code'] ?? null,
+                'ndc_code' => $data['ndc_code'] ?? null,
+                'generic_name' => $data['generic_name'],
+                'display_name' => $data['brand_name'] ?: $data['generic_name'],
+                'brand_name' => $data['brand_name'] ?? null,
+                'strength_text' => $data['strength'] ?? null,
+                'dosage_form_text' => $data['dosage_form'] ?? null,
+                'is_cached_external' => false,
+                'is_active' => (bool) ($data['is_active'] ?? true),
+                'raw_payload' => $data,
+            ]
+        );
+    }
+
+    protected function resolveDrugSourceIdentifier(array $data): string
+    {
+        if (filled($data['rxnorm_code'] ?? null)) {
+            return 'rxnorm:'.$data['rxnorm_code'];
+        }
+
+        if (filled($data['ndc_code'] ?? null)) {
+            return 'ndc:'.$data['ndc_code'];
+        }
+
+        return 'local:'.md5(Str::lower(implode('|', [
+            $data['generic_name'] ?? '',
+            $data['brand_name'] ?? '',
+            $data['strength'] ?? '',
+            $data['dosage_form'] ?? '',
+        ])));
     }
 }

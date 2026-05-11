@@ -10,9 +10,10 @@ use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
+use Modules\Pharmacy\Classes\Services\DrugMaterializationService;
+use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
-use Modules\Pharmacy\Classes\Services\MedicationService;
-use Modules\Pharmacy\Classes\Services\RxNormService;
+use Modules\Pharmacy\Models\Drug;
 
 class MedicationOrderAction
 {
@@ -32,51 +33,61 @@ class MedicationOrderAction
                             ->searchable()
                             ->live()
                             ->getSearchResultsUsing(function (string $search) {
-                                $localServices = Service::query()
-                                    ->whereHas('category', fn ($q) => $q->where('code', 'MED'))
-                                    ->where('name', 'like', "%{$search}%")
-                                    ->limit(10)
-                                    ->pluck('name', 'id')
-                                    ->toArray();
+                                return collect(app(DrugSearchService::class)->search($search, 10))
+                                    ->mapWithKeys(function (array $result): array {
+                                        if (filled($result['service_id'])) {
+                                            return [
+                                                (string) $result['service_id'] => '[Catalog] '.$result['display_name'],
+                                            ];
+                                        }
 
-                                $rxNormService = app(RxNormService::class);
-                                $externalResults = $rxNormService->search($search);
+                                        if (filled($result['drug_id'])) {
+                                            $prefix = $result['source_provider'] === 'local' ? '[Reference] ' : '[External] ';
 
-                                $externalFormatted = [];
-                                foreach (array_slice($externalResults, 0, 10) as $external) {
-                                    $externalFormatted['rxnorm:'.$external['rxcui'].':'.$external['name']] = '[External] '.$external['name'];
-                                }
+                                            return [
+                                                'drug:'.$result['drug_id'] => $prefix.$result['display_name'],
+                                            ];
+                                        }
 
-                                return $localServices + $externalFormatted;
+                                        return [];
+                                    })
+                                    ->all();
                             })
                             ->getOptionLabelUsing(function ($value): ?string {
-                                if (str_starts_with($value, 'rxnorm:')) {
-                                    $parts = explode(':', $value, 3);
+                                if (str_starts_with($value, 'drug:')) {
+                                    $drugId = str($value)->after('drug:')->toString();
+                                    $drug = Drug::query()->find($drugId);
 
-                                    return isset($parts[2]) ? '[External] '.$parts[2] : $value;
+                                    if (! $drug) {
+                                        return $value;
+                                    }
+
+                                    $prefix = $drug->source_provider === 'local' ? '[Reference] ' : '[External] ';
+
+                                    return $prefix.$drug->display_name;
                                 }
 
                                 return Service::find($value)?->name;
                             })
                             ->afterStateUpdated(function ($state, Set $set) {
-                                if (str_starts_with($state, 'rxnorm:')) {
-                                    $parts = explode(':', $state, 3);
-                                    $rxcui = $parts[1] ?? null;
-                                    $name = $parts[2] ?? 'Unknown Medication';
+                                if (str_starts_with($state, 'drug:')) {
+                                    $drugId = str($state)->after('drug:')->toString();
+                                    $drug = Drug::query()->find($drugId);
 
-                                    // Materialize it in the local DB
-                                    $medicationService = app(MedicationService::class);
-                                    $medication = $medicationService->createWithService([
-                                        'rxnorm_code' => $rxcui,
-                                        'generic_name' => $name,
-                                        'service_name' => $name,
-                                        'price' => 0, // Needs pricing by pharmacy later
+                                    if (! $drug) {
+                                        return;
+                                    }
+
+                                    $medication = app(DrugMaterializationService::class)->materialize($drug, [
+                                        'service_name' => $drug->display_name,
+                                        'price' => 0,
+                                        'insurance_price' => 0,
+                                        'is_insurance_covered' => false,
                                         'is_active' => true,
                                         'requires_prescription' => true,
-                                        'dosage_form' => 'tablet', // Default fallback
+                                        'dosage_form' => 'tablet',
                                     ]);
 
-                                    // Set the newly created local service_id
                                     $set('service_id', $medication->service_id);
                                 }
                             }),
