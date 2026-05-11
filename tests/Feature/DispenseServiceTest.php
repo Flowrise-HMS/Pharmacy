@@ -10,9 +10,11 @@ use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\ServiceCategory;
 use Modules\Pharmacy\Classes\Services\DispenseService;
+use Modules\Pharmacy\Exceptions\DuplicateDispenseException;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class DispenseServiceTest extends TestCase
@@ -37,8 +39,9 @@ class DispenseServiceTest extends TestCase
             'quantity_on_hand' => 12,
         ]);
 
-        $baseUser = User::factory()->create();
-        $pharmacyUser = $this->authorizedUserFor($baseUser->id);
+        $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
+        Role::findOrCreate('pharmacist', 'web');
+        $pharmacyUser->assignRole('pharmacist');
 
         $dispense = app(DispenseService::class)->dispense($requestItem, [
             'medication_id' => $medication->id,
@@ -74,10 +77,37 @@ class DispenseServiceTest extends TestCase
     public function test_it_blocks_dispense_when_payment_is_required_but_not_settled(): void
     {
         [, , $requestItem, $medication] = $this->seedDispenseFixture(true);
-        $baseUser = User::factory()->create();
-        $pharmacyUser = $this->authorizedUserFor($baseUser->id);
+        $pharmacyUser = User::factory()->create();
+        Role::findOrCreate('pharmacist', 'web');
+        $pharmacyUser->assignRole('pharmacist');
 
         $this->expectException(UnauthorizedMedicationOrderException::class);
+
+        app(DispenseService::class)->dispense($requestItem, [
+            'medication_id' => $medication->id,
+            'quantity' => 1,
+        ], $pharmacyUser);
+    }
+
+    public function test_it_blocks_duplicate_dispense_for_same_request_item(): void
+    {
+        [$branch, , $requestItem, $medication] = $this->seedDispenseFixture(false);
+        StockItem::factory()->create([
+            'branch_id' => $branch->id,
+            'medication_id' => $medication->id,
+            'quantity_on_hand' => 12,
+        ]);
+
+        $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
+        Role::findOrCreate('pharmacist', 'web');
+        $pharmacyUser->assignRole('pharmacist');
+
+        app(DispenseService::class)->dispense($requestItem, [
+            'medication_id' => $medication->id,
+            'quantity' => 1,
+        ], $pharmacyUser);
+
+        $this->expectException(DuplicateDispenseException::class);
 
         app(DispenseService::class)->dispense($requestItem, [
             'medication_id' => $medication->id,
@@ -124,22 +154,4 @@ class DispenseServiceTest extends TestCase
 
         return [$branch, $service, $item, $medication];
     }
-
-    protected function authorizedUserFor(int $id): User
-    {
-        return new class($id) extends User
-        {
-            public function __construct(int $id)
-            {
-                parent::__construct();
-                $this->id = $id;
-            }
-
-            public function hasAnyRole($roles, ?string $guard = null): bool
-            {
-                return true;
-            }
-        };
-    }
 }
-

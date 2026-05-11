@@ -137,7 +137,7 @@ class PharmacyPosCheckoutService
                         patientId: $patientId,
                         itemType: 'service',
                         externalCode: (string) $service->id,
-                        fallbackAmount: $netBeforeTax,
+                        fallbackAmount: $gross,
                     );
                     $lineData['insurance_expected_amount'] = $pricing['insurer_amount'];
                     $lineData['patient_responsibility_amount'] = $pricing['patient_amount'];

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Support\Htmlable;
 
 enum ControlledSchedule: string implements HasColor, HasDescription, HasLabel
 {
+    case SCHEDULE_1 = 'schedule_1';
     case SCHEDULE_2 = 'schedule_2';
     case SCHEDULE_3 = 'schedule_3';
     case SCHEDULE_4 = 'schedule_4';
@@ -22,6 +23,7 @@ enum ControlledSchedule: string implements HasColor, HasDescription, HasLabel
     public function getDescription(): string|Htmlable|null
     {
         return match ($this) {
+            self::SCHEDULE_1 => 'No accepted medical use; highest abuse potential (research / non-prescribable).',
             self::SCHEDULE_2 => 'High potential for abuse with accepted medical use.',
             self::SCHEDULE_3 => 'Moderate to low dependence risk.',
             self::SCHEDULE_4 => 'Low potential for abuse and dependence.',
@@ -32,6 +34,7 @@ enum ControlledSchedule: string implements HasColor, HasDescription, HasLabel
     public function getColor(): string|array|null
     {
         return match ($this) {
+            self::SCHEDULE_1 => 'danger',
             self::SCHEDULE_2 => 'danger',
             self::SCHEDULE_3 => 'warning',
             self::SCHEDULE_4 => 'info',

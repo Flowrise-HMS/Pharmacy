@@ -3,7 +3,7 @@
 namespace Modules\Pharmacy\Classes\Services;
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Modules\Billing\Enums\InvoiceLineStatus;
@@ -12,6 +12,7 @@ use Modules\Clinical\Enums\TaskOutcome;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\Task;
 use Modules\Core\Contracts\StockProviderContract;
+use Modules\Pharmacy\Exceptions\DuplicateDispenseException;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Dispense;
 use Modules\Pharmacy\Models\Medication;
@@ -40,11 +41,26 @@ class DispenseService
             throw new UnauthorizedMedicationOrderException('Payment is required before dispensing this item.');
         }
 
+        if (Dispense::query()->where('request_item_id', $item->id)->exists()) {
+            throw new DuplicateDispenseException('This order line has already been dispensed.');
+        }
+
+        if (! empty($data['expiry_date'] ?? null)) {
+            $expiry = Carbon::parse((string) $data['expiry_date'])->startOfDay();
+            if ($expiry->lt(now()->startOfDay())) {
+                throw new UnauthorizedMedicationOrderException('Expiry date cannot be in the past.');
+            }
+        }
+
         $medication = Medication::query()->findOrFail($data['medication_id']);
         $branchId = (string) $item->serviceRequest->branch_id;
         $qty = (int) $data['quantity'];
 
         return DB::transaction(function () use ($item, $data, $dispensedBy, $medication, $branchId, $qty) {
+            if (Dispense::query()->where('request_item_id', $item->id)->lockForUpdate()->exists()) {
+                throw new DuplicateDispenseException('This order line has already been dispensed.');
+            }
+
             $this->stockProvider->decrement($branchId, $medication->id, $qty, 'dispense');
 
             $dispense = Dispense::query()->create([
