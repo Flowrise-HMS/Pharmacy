@@ -4,10 +4,13 @@ namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Sche
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Modules\Core\Models\Service;
+use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Enums\DosageForm;
+use Modules\Pharmacy\Models\Drug;
 
 class MedicationForm
 {
@@ -15,11 +18,48 @@ class MedicationForm
     {
         return $schema
             ->components([
+                Select::make('drug_reference_id')
+                    ->label('Drug Reference')
+                    ->searchable()
+                    ->live()
+                    ->dehydrated(false)
+                    ->placeholder('Search local and external drug references')
+                    ->getSearchResultsUsing(function (string $search): array {
+                        return collect(app(DrugSearchService::class)->search($search, 10))
+                            ->filter(fn (array $result): bool => filled($result['drug_id']))
+                            ->mapWithKeys(fn (array $result): array => [
+                                $result['drug_id'] => ($result['source'] === 'external' ? '[External] ' : '').$result['display_name'],
+                            ])
+                            ->all();
+                    })
+                    ->getOptionLabelUsing(fn ($value): ?string => Drug::query()->find($value)?->display_name)
+                    ->afterStateUpdated(function ($state, Set $set): void {
+                        $drug = filled($state) ? Drug::query()->find($state) : null;
+
+                        if (! $drug) {
+                            return;
+                        }
+
+                        $set('generic_name', $drug->generic_name);
+                        $set('brand_name', $drug->brand_name);
+                        $set('strength', $drug->strength_text);
+                        $set('rxnorm_code', $drug->rxnorm_code);
+                        $set('ndc_code', $drug->ndc_code);
+
+                        if (filled($drug->dosage_form_text)) {
+                            $normalized = strtolower(trim($drug->dosage_form_text));
+                            $allowedValues = collect(DosageForm::cases())->map(fn (DosageForm $case) => $case->value)->all();
+
+                            if (in_array($normalized, $allowedValues, true)) {
+                                $set('dosage_form', $normalized);
+                            }
+                        }
+                    }),
                 Select::make('service_id')
                     ->label('Service')
                     ->required()
                     ->searchable()
-                    ->options(fn () => Service::query()->orderBy('name')->pluck('name', 'id')->toArray()),
+                    ->options(fn () => Service::query()?->orderBy('name')?->pluck('name', 'id')?->toArray()),
                 TextInput::make('generic_name')
                     ->required()
                     ->maxLength(255),

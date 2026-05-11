@@ -5,8 +5,6 @@ namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockItems\Schem
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Modules\Core\Models\Branch;
-use Modules\Pharmacy\Models\Medication;
 
 class StockItemForm
 {
@@ -17,11 +15,15 @@ class StockItemForm
                 Select::make('medication_id')
                     ->required()
                     ->searchable()
-                    ->options(fn () => Medication::query()->orderBy('generic_name')->pluck('generic_name', 'id')->toArray()),
+                    ->label(__('Medication'))
+                    ->relationship('medication', 'generic_name')
+                    ->preload(),
                 Select::make('branch_id')
                     ->required()
+                    ->relationship('branch', 'name')
+                    ->label(__('Branch'))
                     ->searchable()
-                    ->options(fn () => Branch::query()->orderBy('name')->pluck('name', 'id')->toArray()),
+                    ->preload(),
                 TextInput::make('quantity_on_hand')
                     ->numeric()
                     ->required()

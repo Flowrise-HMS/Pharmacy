@@ -55,4 +55,9 @@ class Medication extends Model
     {
         return $this->hasMany(Dispense::class);
     }
+
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
 }

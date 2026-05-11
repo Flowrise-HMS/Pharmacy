@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Pharmacy\Exceptions\InsufficientStockException;
 use Modules\Pharmacy\Models\StockItem;
+use Modules\Pharmacy\Models\StockMovement;
 
 class StockService implements StockProviderContract
 {
@@ -98,7 +99,7 @@ class StockService implements StockProviderContract
             return;
         }
 
-        DB::table('stock_movements')->insert([
+        StockMovement::create([
             'id' => (string) Str::uuid(),
             'branch_id' => $branchId,
             'medication_id' => $medicationId,
