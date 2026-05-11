@@ -81,4 +81,3 @@ class MedicationOrderingAuthorityTest extends TestCase
         );
     }
 }
-

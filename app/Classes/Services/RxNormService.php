@@ -9,9 +9,6 @@ class RxNormService
 {
     /**
      * Search for RxCUIs based on a drug name using the Prescribable RxNorm API.
-     * 
-     * @param string $query
-     * @return array
      */
     public function search(string $query): array
     {
@@ -19,19 +16,19 @@ class RxNormService
             return [];
         }
 
-        $cacheKey = 'rxnorm_search_v2_' . preg_replace('/[^a-z0-9]/', '', strtolower($query));
+        $cacheKey = 'rxnorm_search_v2_'.preg_replace('/[^a-z0-9]/', '', strtolower($query));
 
         return Cache::remember($cacheKey, now()->addDays(7), function () use ($query) {
             try {
                 // Step 1: Find RxCUIs by string (Approximate match for better suggestions)
                 $response = Http::timeout(5)->get('https://rxnav.nlm.nih.gov/REST/Prescribe/rxcui.json', [
                     'name' => $query,
-                    'search' => 1 // 1 = Approximate match
+                    'search' => 1, // 1 = Approximate match
                 ]);
 
                 if ($response->successful()) {
                     $cuis = $response->json('idGroup.rxnormId', []);
-                    
+
                     if (empty($cuis)) {
                         return [];
                     }
@@ -55,20 +52,17 @@ class RxNormService
             } catch (\Exception $e) {
                 return [];
             }
-            
+
             return [];
         });
     }
 
     /**
      * Get properties for a specific RxCUI.
-     * 
-     * @param string $cui
-     * @return array|null
      */
     public function getConceptProperties(string $cui): ?array
     {
-        return Cache::remember('rxnorm_concept_' . $cui, now()->addDays(30), function () use ($cui) {
+        return Cache::remember('rxnorm_concept_'.$cui, now()->addDays(30), function () use ($cui) {
             try {
                 $response = Http::timeout(5)->get("https://rxnav.nlm.nih.gov/REST/Prescribe/rxcui/{$cui}/property.json");
 
@@ -85,13 +79,10 @@ class RxNormService
 
     /**
      * Get related information for an RxCUI.
-     * 
-     * @param string $cui
-     * @return array
      */
     public function getAllRelatedInfo(string $cui): array
     {
-        return Cache::remember('rxnorm_related_' . $cui, now()->addDays(30), function () use ($cui) {
+        return Cache::remember('rxnorm_related_'.$cui, now()->addDays(30), function () use ($cui) {
             try {
                 $response = Http::timeout(5)->get("https://rxnav.nlm.nih.gov/REST/Prescribe/rxcui/{$cui}/allrelated.json");
 

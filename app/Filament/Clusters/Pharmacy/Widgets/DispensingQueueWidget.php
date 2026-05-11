@@ -11,6 +11,7 @@ use Modules\Pharmacy\Filament\Clusters\Pharmacy\PharmacyCluster;
 class DispensingQueueWidget extends BaseWidget
 {
     protected static ?string $cluster = PharmacyCluster::class;
+
     protected function getStats(): array
     {
         $count = RequestItem::query()

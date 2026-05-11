@@ -29,9 +29,9 @@ use Modules\Pharmacy\Models\StockItem;
 
 class PharmacyPos extends Page implements HasActions, HasTable
 {
+    use HasPageShield;
     use InteractsWithActions;
     use InteractsWithTable;
-    use HasPageShield;
 
     protected static string $layout = 'filament-panels::components.layout.base';
 
@@ -191,7 +191,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 : __('No active medications with quantity for this branch.'))
             ->recordAction('add_to_cart')
             ->actions([
-               Action::make('add_to_cart')
+                Action::make('add_to_cart')
                     ->action(fn (Medication $record) => $this->addToCart($record->id)),
             ]);
     }

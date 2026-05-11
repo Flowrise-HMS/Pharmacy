@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Pharmacy\Policies;
 
+use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Foundation\Auth\User as AuthUser;
 use Modules\Pharmacy\Models\Medication;
-use Illuminate\Auth\Access\HandlesAuthorization;
 
 class MedicationPolicy
 {
     use HandlesAuthorization;
-    
+
     public function viewAny(AuthUser $authUser): bool
     {
         return $authUser->can('ViewAny Medication');
@@ -66,5 +66,4 @@ class MedicationPolicy
     {
         return $authUser->can('Reorder Medication');
     }
-
 }

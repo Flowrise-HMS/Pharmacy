@@ -44,7 +44,7 @@ class MedicationOrderAction
 
                                 $externalFormatted = [];
                                 foreach (array_slice($externalResults, 0, 10) as $external) {
-                                    $externalFormatted['rxnorm:' . $external['rxcui'] . ':' . $external['name']] = '[External] ' . $external['name'];
+                                    $externalFormatted['rxnorm:'.$external['rxcui'].':'.$external['name']] = '[External] '.$external['name'];
                                 }
 
                                 return $localServices + $externalFormatted;
@@ -52,8 +52,10 @@ class MedicationOrderAction
                             ->getOptionLabelUsing(function ($value): ?string {
                                 if (str_starts_with($value, 'rxnorm:')) {
                                     $parts = explode(':', $value, 3);
-                                    return isset($parts[2]) ? '[External] ' . $parts[2] : $value;
+
+                                    return isset($parts[2]) ? '[External] '.$parts[2] : $value;
                                 }
+
                                 return Service::find($value)?->name;
                             })
                             ->afterStateUpdated(function ($state, Set $set) {

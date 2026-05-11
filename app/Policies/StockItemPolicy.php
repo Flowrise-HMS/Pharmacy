@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Pharmacy\Policies;
 
+use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Foundation\Auth\User as AuthUser;
 use Modules\Pharmacy\Models\StockItem;
-use Illuminate\Auth\Access\HandlesAuthorization;
 
 class StockItemPolicy
 {
     use HandlesAuthorization;
-    
+
     public function viewAny(AuthUser $authUser): bool
     {
         return $authUser->can('ViewAny StockItem');
@@ -66,5 +66,4 @@ class StockItemPolicy
     {
         return $authUser->can('Reorder StockItem');
     }
-
 }

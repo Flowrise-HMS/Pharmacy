@@ -23,5 +23,4 @@ class PharmacyCluster extends Cluster
             DispensingQueueWidget::class,
         ];
     }
-
 }

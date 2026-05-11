@@ -4,8 +4,8 @@ namespace Modules\Pharmacy\Classes\Services;
 
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Billing\Enums\InvoiceLineStatus;
 use Modules\Billing\Models\InvoiceLine;
 use Modules\Clinical\Enums\TaskOutcome;
@@ -105,4 +105,3 @@ class DispenseService
             ->exists();
     }
 }
-

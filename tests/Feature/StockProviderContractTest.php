@@ -43,4 +43,3 @@ class StockProviderContractTest extends TestCase
         $this->assertSame(18, $stockService->getQuantityOnHand($branch->id, $medication->id));
     }
 }
-

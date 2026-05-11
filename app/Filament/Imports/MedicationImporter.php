@@ -6,8 +6,8 @@ use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Illuminate\Support\Number;
-use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Classes\Services\MedicationService;
+use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
 
 class MedicationImporter extends Importer
@@ -63,15 +63,19 @@ class MedicationImporter extends Importer
     {
         if (isset($this->data['ndc_code'])) {
             $medication = Medication::where('ndc_code', $this->data['ndc_code'])->first();
-            if ($medication) return $medication;
+            if ($medication) {
+                return $medication;
+            }
         }
 
         if (isset($this->data['rxnorm_code'])) {
             $medication = Medication::where('rxnorm_code', $this->data['rxnorm_code'])->first();
-            if ($medication) return $medication;
+            if ($medication) {
+                return $medication;
+            }
         }
 
-        return new Medication();
+        return new Medication;
     }
 
     public function saveRecord(): void
@@ -82,7 +86,7 @@ class MedicationImporter extends Importer
         if ($this->record->exists) {
             // Update existing medication
             $this->record->update(array_intersect_key($data, array_flip((new Medication)->getFillable())));
-            
+
             // Update associated service
             if ($this->record->service) {
                 $this->record->service->update([
@@ -99,7 +103,7 @@ class MedicationImporter extends Importer
         }
 
         // Handle initial stock creation if provided
-        if (!empty($data['initial_stock_quantity']) && !empty($data['branch_id'])) {
+        if (! empty($data['initial_stock_quantity']) && ! empty($data['branch_id'])) {
             StockItem::firstOrCreate([
                 'medication_id' => $this->record->id,
                 'branch_id' => $data['branch_id'],
@@ -107,16 +111,16 @@ class MedicationImporter extends Importer
                 'quantity_on_hand' => 0, // initial creation
                 'reorder_point' => 10,
                 'reorder_quantity' => 50,
-            ])->increment('quantity_on_hand', (int)$data['initial_stock_quantity']);
+            ])->increment('quantity_on_hand', (int) $data['initial_stock_quantity']);
         }
     }
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Your medication import has completed and ' . Number::format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
+        $body = 'Your medication import has completed and '.Number::format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
 
         if ($failedRowsCount = $import->getFailedRowsCount()) {
-            $body .= ' ' . Number::format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
+            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
         }
 
         return $body;

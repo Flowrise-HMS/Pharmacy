@@ -2,8 +2,11 @@
 
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Pages;
 
+use Filament\Actions\CreateAction;
+use Filament\Actions\ImportAction;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\MedicationResource;
+use Modules\Pharmacy\Filament\Imports\MedicationImporter;
 
 class ListMedications extends ListRecords
 {
@@ -12,10 +15,10 @@ class ListMedications extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            \Filament\Actions\ImportAction::make()
-                ->importer(\Modules\Pharmacy\Filament\Imports\MedicationImporter::class)
+            ImportAction::make()
+                ->importer(MedicationImporter::class)
                 ->color('info'),
-            \Filament\Actions\CreateAction::make(),
+            CreateAction::make(),
         ];
     }
 }
