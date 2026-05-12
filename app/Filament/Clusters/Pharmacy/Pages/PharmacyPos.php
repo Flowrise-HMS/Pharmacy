@@ -250,8 +250,9 @@ class PharmacyPos extends Page implements HasActions, HasTable
                                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                                 : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400');
 
+                        $currency = config('core.default_currency');
                         return '<div class="flex items-center justify-between mt-2">'
-                            ."<span class=\"text-lg font-bold text-primary-600 dark:text-primary-400\">GHS {$price}</span>"
+                            ."<span class=\"text-lg font-bold text-primary-600 dark:text-primary-400\">{$currency} {$price}</span>"
                             ."<span class=\"text-xs px-2 py-0.5 rounded-full {$badgeClass}\">"
                             .($qty > 0 ? "{$qty} ".__('in stock') : __('Out of stock'))
                             .'</span>'
@@ -280,7 +281,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->placeholder('—'),
             TextColumn::make('service.price')
                 ->label(__('Price'))
-                ->money('GHS')
+                ->money(config('core.default_currency'))
                 ->alignRight()
                 ->weight('bold'),
             TextColumn::make('stock_qty')
@@ -467,7 +468,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'guest_name' => $this->selectedPatientId ? null : $this->guestName,
                 'guest_phone' => $this->selectedPatientId ? null : $this->guestPhone,
                 'guest_email' => $this->selectedPatientId ? null : $this->guestEmail,
-                'currency' => 'GHS',
+                'currency' => config('core.default_currency'),
                 'cart' => $this->cart->map(fn ($item) => [
                     'medication_id' => $item['id'],
                     'quantity' => $item['quantity'],

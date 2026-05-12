@@ -6,6 +6,7 @@ use BackedEnum;
 use Filament\Clusters\Cluster;
 use Filament\Support\Icons\Heroicon;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Widgets\DispensingQueueWidget;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Widgets\PharmacyStatsWidget;
 use Override;
 
 class PharmacyCluster extends Cluster
@@ -21,6 +22,7 @@ class PharmacyCluster extends Cluster
     {
         return [
             DispensingQueueWidget::class,
+            PharmacyStatsWidget::class,
         ];
     }
 }

@@ -119,7 +119,7 @@
                                     {{ $item['name'] }}
                                 </p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {{ __('GHS') }} {{ number_format($item['price'], 2) }}
+                                    {{ config('core.default_currency') }} {{ number_format($item['price'], 2) }}
                                 </p>
                                 <div class="flex items-center gap-2 mt-1.5">
                                     <button type="button" wire:click="updateQuantity('{{ $id }}', {{ $item['quantity'] - 1 }})"
@@ -139,7 +139,7 @@
                             </div>
                             <div class="text-right flex-shrink-0">
                                 <p class="font-semibold text-sm text-gray-900 dark:text-white">
-                                    {{ __('GHS') }} {{ number_format($item['price'] * $item['quantity'], 2) }}
+                                    {{ config('core.default_currency') }} {{ number_format($item['price'] * $item['quantity'], 2) }}
                                 </p>
                                 <button type="button" wire:click="removeFromCart('{{ $id }}')"
                                     class="text-xs text-red-500 hover:text-red-700 mt-1 transition">
@@ -172,7 +172,7 @@
                     <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
                         <span class="text-base font-bold text-gray-900 dark:text-white">{{ __('Grand total') }}</span>
                         <span class="text-xl font-extrabold text-primary-600 dark:text-primary-400">
-                            {{ __('GHS') }} {{ number_format($grandTotal, 2) }}
+                            {{ config('core.default_currency') }} {{ number_format($grandTotal, 2) }}
                         </span>
                     </div>
 
@@ -191,7 +191,7 @@
                     <div class="flex items-center justify-between text-sm">
                         <span class="text-gray-600 dark:text-gray-400">{{ __('Change') }}</span>
                         <span class="font-semibold text-gray-900 dark:text-white">
-                            {{ __('GHS') }} {{ number_format($change, 2) }}
+                            {{ config('core.default_currency') }} {{ number_format($change, 2) }}
                         </span>
                     </div>
 
