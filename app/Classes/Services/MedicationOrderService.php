@@ -6,10 +6,12 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Modules\Clinical\Classes\Services\ServiceRequestService;
+use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\ServiceRequest;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
+use Modules\Pharmacy\Models\PrescriptionDetail;
 
 class MedicationOrderService
 {
@@ -31,31 +33,55 @@ class MedicationOrderService
                     ->title('You cannot order prescription required medications.')
                     ->danger()
                     ->send();
-                if(config('app.env') != 'product ' && config('app.env') != 'production'){
+                if (config('app.env') != 'product ' && config('app.env') != 'production') {
                     throw new UnauthorizedMedicationOrderException('This user cannot order prescription-required items.');
                 }
-                return;
+
+                return null;
             }
         }
 
         return DB::transaction(function () use ($patientOrGuest, $items, $orderedBy, $encounterId) {
-            if ($patientOrGuest instanceof Patient) {
-                return $this->serviceRequestService->createForPatient(
+            $request = $patientOrGuest instanceof Patient
+                ? $this->serviceRequestService->createForPatient(
                     patient: $patientOrGuest,
                     serviceIds: $items,
                     encounterId: $encounterId,
                     orderedBy: $orderedBy->id
+                )
+                : $this->serviceRequestService->createForGuest(
+                    guestName: $patientOrGuest['guest_name'],
+                    guestPhone: $patientOrGuest['guest_phone'],
+                    serviceIds: $items,
+                    guestEmail: $patientOrGuest['guest_email'] ?? null,
+                    branchId: $patientOrGuest['branch_id'] ?? null,
+                    orderedBy: $orderedBy->id
                 );
+
+            foreach ($request->items as $index => $item) {
+                $itemData = $items[$index] ?? [];
+
+                $prescriptionFields = [
+                    'dosage', 'frequency', 'route', 'duration_days',
+                    'instructions', 'prn', 'indication', 'refills',
+                ];
+
+                if (! empty(array_intersect_key(array_flip($prescriptionFields), $itemData))) {
+                    PrescriptionDetail::create([
+                        'request_item_id' => $item->id,
+                        'dosage' => $itemData['dosage'] ?? null,
+                        'frequency' => $itemData['frequency'] ?? null,
+                        'route' => $itemData['route'] ?? null,
+                        'duration_days' => $itemData['duration_days'] ?? null,
+                        'instructions' => $itemData['instructions'] ?? null,
+                        'prn' => filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                        'indication' => $itemData['indication'] ?? null,
+                        'refills' => $itemData['refills'] ?? 0,
+                    ]);
+                }
             }
 
-            return $this->serviceRequestService->createForGuest(
-                guestName: $patientOrGuest['guest_name'],
-                guestPhone: $patientOrGuest['guest_phone'],
-                serviceIds: $items,
-                guestEmail: $patientOrGuest['guest_email'] ?? null,
-                branchId: $patientOrGuest['branch_id'] ?? null,
-                orderedBy: $orderedBy->id
-            );
+            return $request;
         });
     }
 
