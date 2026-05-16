@@ -251,6 +251,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                                 : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400');
 
                         $currency = config('core.default_currency');
+
                         return '<div class="flex items-center justify-between mt-2">'
                             ."<span class=\"text-lg font-bold text-primary-600 dark:text-primary-400\">{$currency} {$price}</span>"
                             ."<span class=\"text-xs px-2 py-0.5 rounded-full {$badgeClass}\">"

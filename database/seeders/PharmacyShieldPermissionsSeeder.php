@@ -21,13 +21,6 @@ class PharmacyShieldPermissionsSeeder extends Seeder
             'checkout PharmacyPos',
         ];
 
-        foreach ($posPermissionNames as $name) {
-            Permission::query()->firstOrCreate([
-                'name' => $name,
-                'guard_name' => $guard,
-            ]);
-        }
-
         $pharmacyRoleNames = ['pharmacist', 'pharmacy_technician'];
 
         foreach ($pharmacyRoleNames as $roleName) {
@@ -36,6 +29,15 @@ class PharmacyShieldPermissionsSeeder extends Seeder
                 continue;
             }
             $role->givePermissionTo($posPermissionNames);
+        }
+
+        $prescriptionRoles = ['doctor', 'pharmacist', 'pharmacy_technician'];
+        foreach ($prescriptionRoles as $roleName) {
+            $role = Role::query()->where('name', $roleName)->where('guard_name', $guard)->first();
+            if ($role === null) {
+                continue;
+            }
+            $role->givePermissionTo('order_prescription_medication');
         }
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

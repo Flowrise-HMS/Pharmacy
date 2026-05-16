@@ -13,6 +13,8 @@ use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\DrugMaterializationService;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
+use Modules\Pharmacy\Classes\Services\MedicationService;
+use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Models\Drug;
 
 class MedicationOrderAction
@@ -23,6 +25,8 @@ class MedicationOrderAction
             ->label('Medication Order')
             ->icon('heroicon-m-beaker')
             ->slideOver()
+            ->closeModalByClickingAway(false)
+            ->visible(fn (): bool => Auth::user()?->can('order_prescription_medication') ?? false)
             ->schema([
                 Repeater::make('items')
                     ->minItems(1)
@@ -68,6 +72,22 @@ class MedicationOrderAction
                                 }
 
                                 return Service::find($value)?->name;
+                            })
+                            ->preload()
+                            ->createOptionForm([
+                                TextInput::make('generic_name')
+                                    ->required()
+                                    ->maxLength(255),
+                                TextInput::make('brand_name')
+                                    ->maxLength(255),
+                                TextInput::make('strength')
+                                    ->maxLength(255),
+                                Select::make('dosage_form')
+                                    ->options(DosageForm::class)
+                                    ->default(DosageForm::TABLET),
+                            ])
+                            ->createOptionUsing(function (array $data): string {
+                                return app(MedicationService::class)->createWithService($data)->service_id;
                             })
                             ->afterStateUpdated(function ($state, Set $set) {
                                 if (str_starts_with($state, 'drug:')) {
