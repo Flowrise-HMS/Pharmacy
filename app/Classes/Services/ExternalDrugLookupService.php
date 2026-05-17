@@ -29,8 +29,8 @@ class ExternalDrugLookupService
 
         return Cache::remember($cacheKey, now()->addDays(7), function () use ($provider, $query, $limit): array {
             return match ($provider) {
-                'openfda' => $this->mapOpenFdaResults($this->openFdaService->search($query), $limit),
-                default => $this->mapRxNormResults($this->rxNormService->search($query), $limit),
+                // 'openfda' => $this->mapOpenFdaResults($this->openFdaService->search($query), $limit),
+                'rxnorm' => $this->mapRxNormResults($this->rxNormService->search($query), $limit),
             };
         });
     }

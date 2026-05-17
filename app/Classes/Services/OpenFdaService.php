@@ -4,9 +4,15 @@ namespace Modules\Pharmacy\Classes\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class OpenFdaService
 {
+    private const BASE_URL = 'https://api.fda.gov/drug/ndc.json';
+
+    private const CACHE_TTL = 7;
+
     /**
      * Search the OpenFDA NDC database for medications.
      *
@@ -15,53 +21,102 @@ class OpenFdaService
      */
     public function search(string $query): array
     {
+        $query = trim($query);
         if (strlen($query) < 3) {
             return [];
         }
 
-        $cacheKey = 'openfda_search_'.preg_replace('/[^a-z0-9]/', '', strtolower($query));
+        $cacheKey = 'openfda_search_v2_'.md5(strtolower($query));
 
-        return Cache::remember($cacheKey, now()->addDays(7), function () use ($query) {
+        return Cache::remember($cacheKey, now()->addDays(self::CACHE_TTL), function () use ($query) {
             try {
-                // OpenFDA API uses Lucene query syntax
-                $searchQuery = 'generic_name:"*'.$query.'*" OR brand_name:"*'.$query.'*"';
+                // Better search syntax (more efficient than *query* on every character)
+                $searchQuery = '(generic_name:"'.$query.'" OR brand_name:"'.$query.'" OR brand_name_base:"'.$query.'")';
 
-                $response = Http::timeout(5)->get('https://api.fda.gov/drug/ndc.json', [
-                    'search' => $searchQuery,
-                    'limit' => 10,
-                ]);
+                $response = Http::timeout(10)
+                    ->get(self::BASE_URL, [
+                        'search' => $searchQuery,
+                        'limit' => 15,
+                    ]);
 
-                if ($response->successful()) {
-                    $results = [];
-                    $data = $response->json('results', []);
+                if (! $response->successful()) {
+                    Log::warning('OpenFDA API error: '.$response->body());
 
-                    foreach ($data as $item) {
-                        $genericName = $item['generic_name'] ?? '';
-                        $brandName = $item['brand_name'] ?? '';
+                    return [];
+                }
 
-                        // Default to generic name, fallback to brand name
-                        $name = ! empty($genericName) ? $genericName : $brandName;
-                        if (! $name) {
-                            continue;
-                        }
+                $data = $response->json('results', []);
 
-                        $results[] = [
-                            'ndc' => $item['product_ndc'] ?? '',
-                            'name' => ucwords(strtolower($name)),
-                            'brand_name' => ucwords(strtolower($brandName)),
-                            'dosage_form' => $item['dosage_form'] ?? 'Unknown',
-                            'route' => is_array($item['route'] ?? []) ? implode(', ', $item['route']) : ($item['route'] ?? ''),
-                        ];
+                $results = [];
+                $seen = [];
+
+                foreach ($data as $item) {
+                    $generic = $item['generic_name'] ?? '';
+                    $brand = $item['brand_name'] ?? $item['brand_name_base'] ?? '';
+                    $name = $generic ?: $brand;
+
+                    if (empty($name)) {
+                        continue;
                     }
 
-                    return $results;
+                    $ndc = $item['product_ndc'] ?? '';
+
+                    // Avoid duplicates
+                    if (isset($seen[$ndc])) {
+                        continue;
+                    }
+                    $seen[$ndc] = true;
+
+                    $results[] = [
+                        'ndc' => $ndc,
+                        'name' => Str::title($name),
+                        'generic_name' => Str::title($generic),
+                        'brand_name' => Str::title($brand),
+                        'dosage_form' => $item['dosage_form'] ?? null,
+                        'route' => $this->formatRoute($item['route'] ?? []),
+                        'strength' => $this->extractStrength($item),
+                        'manufacturer' => $item['labeler_name'] ?? null,
+                        'rxcui' => $item['openfda']['rxcui'][0] ?? null,
+                        'active_ingredients' => $this->formatActiveIngredients($item['active_ingredients'] ?? []),
+                        'product_type' => $item['product_type'] ?? null,
+                    ];
                 }
+
+                return $results;
+
             } catch (\Exception $e) {
-                // Fail silently to prevent breaking the clinical picker if API is down
+                Log::error('OpenFDA search failed: '.$e->getMessage());
+
                 return [];
             }
-
-            return [];
         });
+    }
+
+    private function formatRoute($route): string
+    {
+        if (is_array($route)) {
+            return implode(', ', array_map('ucwords', $route));
+        }
+
+        return ucwords((string) $route);
+    }
+
+    private function extractStrength(array $item): ?string
+    {
+        if (! empty($item['active_ingredients'][0]['strength'])) {
+            return $item['active_ingredients'][0]['strength'];
+        }
+
+        return null;
+    }
+
+    private function formatActiveIngredients(array $ingredients): array
+    {
+        return array_map(function ($ing) {
+            return [
+                'name' => $ing['name'] ?? '',
+                'strength' => $ing['strength'] ?? '',
+            ];
+        }, $ingredients);
     }
 }

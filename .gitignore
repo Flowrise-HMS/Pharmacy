@@ -1,0 +1,6 @@
+/vendor
+/node_modules
+composer.lock
+.env
+.phpunit.result.cache
+resources/assets/data/

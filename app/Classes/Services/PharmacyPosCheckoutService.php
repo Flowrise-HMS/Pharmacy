@@ -39,7 +39,7 @@ class PharmacyPosCheckoutService
         }
 
         $patientId = $data['patient_id'] ?? null;
-        $currency = $data['currency'] ?? 'GHS';
+        $currency = $data['currency'] ?? config('core.default_currency');
         $cart = $data['cart'];
         $method = $data['payment_method'] ?? PaymentMethod::Cash;
         $posDiscount = PharmacyPosTotals::normalizeMoney($data['pos_discount_amount'] ?? 0);

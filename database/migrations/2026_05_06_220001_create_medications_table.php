@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignUuid('service_id')->constrained('services')->cascadeOnDelete();
             $table->string('rxnorm_code')->nullable();
             $table->string('ndc_code')->nullable();
-            $table->string('generic_name');
+            $table->text('generic_name');
             $table->string('brand_name')->nullable();
             $table->string('dosage_form');
             $table->string('strength')->nullable();
