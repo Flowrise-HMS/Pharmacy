@@ -3,3 +3,4 @@
 composer.lock
 .env
 .phpunit.result.cache
+resources/assets/data/
