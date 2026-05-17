@@ -12,6 +12,7 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Modules\Billing\Models\InvoiceLine;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Service;
@@ -174,47 +175,58 @@ class MedicationOrderAction
                 $service = app(MedicationOrderService::class);
                 $user = Auth::user();
 
-                $request = $patient
-                    ? $service->order($patient, $data['items'], $user, $encounterId)
+                try {
+                    $request = $patient ? $service->order($patient, $data['items'], $user, $encounterId)
                     : $service->order([
                         'guest_name' => $data['guest_name'] ?? 'Guest',
                         'guest_phone' => $data['guest_phone'] ?? '',
                     ], $data['items'], $user, null);
 
-                if ($request && $request->items->isNotEmpty()) {
-                    $itemIds = $request->items->pluck('id')->toArray();
-                    $invoiceLines = InvoiceLine::where('billable_type', (new RequestItem)->getMorphClass())
-                        ->whereIn('billable_id', $itemIds)
-                        ->get();
 
-                    if ($invoiceLines->isNotEmpty()) {
-                        $lines = [];
-                        $totalInsurance = 0;
-                        $totalPatient = 0;
+                    if ($request && $request->items->isNotEmpty()) {
+                        $itemIds = $request->items?->pluck('id')?->toArray() ?? [];
+                        $invoiceLines = InvoiceLine::where('billable_type', (new RequestItem)->getMorphClass())
+                            ->whereIn('billable_id', $itemIds)
+                            ->get();
 
-                        foreach ($invoiceLines as $line) {
-                            $serviceName = $line->service?->name ?? 'Unknown';
-                            $insuranceAmount = (float) ($line->insurance_expected_amount ?? 0);
-                            $patientAmount = (float) ($line->patient_responsibility_amount ?? $line->line_total);
-                            $totalInsurance += $insuranceAmount;
-                            $totalPatient += $patientAmount;
 
-                            if ($insuranceAmount > 0 || $patientAmount > 0) {
-                                $lines[] = "{$serviceName}: Insurance covers {$insuranceAmount} | Patient pays {$patientAmount}";
+                        if ($invoiceLines->isNotEmpty()) {
+                            $lines = [];
+                            $totalInsurance = 0;
+                            $totalPatient = 0;
+
+                            foreach ($invoiceLines as $line) {
+                                $serviceName = $line->service?->name ?? 'Unknown';
+                                $insuranceAmount = (float) ($line->insurance_expected_amount ?? 0);
+                                $patientAmount = (float) ($line->patient_responsibility_amount ?? $line->line_total);
+                                $totalInsurance += $insuranceAmount;
+                                $totalPatient += $patientAmount;
+
+                                if ($insuranceAmount > 0 || $patientAmount > 0) {
+                                    $lines[] = "{$serviceName}: Insurance covers {$insuranceAmount} | Patient pays {$patientAmount}";
+                                }
+                            }
+
+                            if (! empty($lines)) {
+                                $body = implode("\n", $lines);
+                                $body .= "\n\nTotal — Insurance: {$totalInsurance} | Patient: {$totalPatient}";
+
+                                Notification::make()
+                                    ->title('Medication order created — Insurance summary')
+                                    ->body($body)
+                                    ->info()
+                                    ->send();
                             }
                         }
-
-                        if (! empty($lines)) {
-                            $body = implode("\n", $lines);
-                            $body .= "\n\nTotal — Insurance: {$totalInsurance} | Patient: {$totalPatient}";
-
-                            Notification::make()
-                                ->title('Medication order created — Insurance summary')
-                                ->body($body)
-                                ->info()
-                                ->send();
-                        }
                     }
+
+
+                }catch (\Exception $e){
+                    Notification::make()
+                        ->title('Order was not created')
+                        ->danger()
+                        ->send();
+                    Log::error($e->getMessage());
                 }
             });
     }

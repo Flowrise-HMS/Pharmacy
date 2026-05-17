@@ -15,23 +15,7 @@ class PharmacyShieldPermissionsSeeder extends Seeder
 
         $guard = 'web';
 
-        $posPermissionNames = [
-            'View PharmacyPos',
-            'ViewAny PharmacyPos',
-            'checkout PharmacyPos',
-        ];
-
-        $pharmacyRoleNames = ['pharmacist', 'pharmacy_technician'];
-
-        foreach ($pharmacyRoleNames as $roleName) {
-            $role = Role::query()->where('name', $roleName)->where('guard_name', $guard)->first();
-            if ($role === null) {
-                continue;
-            }
-            $role->givePermissionTo($posPermissionNames);
-        }
-
-        $prescriptionRoles = ['doctor', 'pharmacist', 'pharmacy_technician'];
+        $prescriptionRoles = ['doctor', 'pharmacist'];
         foreach ($prescriptionRoles as $roleName) {
             $role = Role::query()->where('name', $roleName)->where('guard_name', $guard)->first();
             if ($role === null) {

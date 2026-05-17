@@ -10,6 +10,7 @@ use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\ServiceRequest;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
+use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 
@@ -67,6 +68,16 @@ class MedicationOrderService
                 ];
 
                 if (! empty(array_intersect_key(array_flip($prescriptionFields), $itemData))) {
+                    $totalAdministrations = null;
+                    if (! empty($itemData['frequency']) && ! empty($itemData['duration_days'])) {
+                        $freq = MedicationFrequency::tryFrom($itemData['frequency']);
+                        $timesPerDay = $freq?->timesPerDay();
+                        $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                        if ($timesPerDay && ! $isPrn) {
+                            $totalAdministrations = $timesPerDay * (int) $itemData['duration_days'];
+                        }
+                    }
+
                     PrescriptionDetail::create([
                         'request_item_id' => $item->id,
                         'dosage' => $itemData['dosage'] ?? null,
@@ -77,6 +88,7 @@ class MedicationOrderService
                         'prn' => filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN),
                         'indication' => $itemData['indication'] ?? null,
                         'refills' => $itemData['refills'] ?? 0,
+                        'total_administrations' => $totalAdministrations,
                     ]);
                 }
             }

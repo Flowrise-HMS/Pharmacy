@@ -35,4 +35,21 @@ enum MedicationFrequency: string implements HasLabel
             self::ONCE => 'One Time (Once)',
         };
     }
+
+    public function timesPerDay(): ?int
+    {
+        return match ($this) {
+            self::QD => 1,
+            self::BID => 2,
+            self::TID => 3,
+            self::QID => 4,
+            self::Q4H => 6,
+            self::Q6H => 4,
+            self::Q8H => 3,
+            self::Q12H => 2,
+            self::PRN => null,
+            self::STAT => 1,
+            self::ONCE => 1,
+        };
+    }
 }

@@ -2,9 +2,9 @@
 
 namespace Modules\Pharmacy\Providers;
 
-use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Pharmacy\Classes\Services\StockService;
+use Modules\Pharmacy\Console\ImportFDANdcDrugData;
 use Modules\Pharmacy\Models\Dispense;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
@@ -30,8 +30,22 @@ class PharmacyServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        RequestItem::resolveRelationUsing('dispenses', function (RequestItem $requestItem) {
+        if (class_exists(\Modules\Clinical\Models\RequestItem::class)) {
+        \Modules\Clinical\Models\RequestItem::resolveRelationUsing('dispenses', function ($requestItem) {
             return $requestItem->hasMany(Dispense::class);
         });
+    }
+        $this->registerCommands();
+
+    }
+
+     /**
+     * Register commands in the format of Command::class
+     */
+    protected function registerCommands(): void
+    {
+        $this->commands([
+            ImportFDANdcDrugData::class,
+        ]);
     }
 }

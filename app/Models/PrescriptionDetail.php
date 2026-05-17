@@ -24,12 +24,14 @@ class PrescriptionDetail extends Model
         'prn',
         'indication',
         'refills',
+        'total_administrations',
     ];
 
     protected $casts = [
         'prn' => 'boolean',
         'duration_days' => 'integer',
         'refills' => 'integer',
+        'total_administrations' => 'integer',
     ];
 
     public function requestItem(): BelongsTo
