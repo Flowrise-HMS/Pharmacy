@@ -52,6 +52,8 @@ class DrugSearchServiceTest extends TestCase
             ]),
         ]);
 
+        config(['pharmacy.enable_external_drug_lookup' => true]);
+
         $results = app(DrugSearchService::class)->search('amox');
 
         $this->assertNotEmpty($results);

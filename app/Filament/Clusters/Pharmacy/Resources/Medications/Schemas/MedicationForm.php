@@ -20,6 +20,14 @@ class MedicationForm
             ->components([
                 Select::make('drug_reference_id')
                     ->label('Drug Reference')
+                    ->options(function () {
+                        return collect(app(DrugSearchService::class)->getTopLocalDrugs(50))
+                            ->filter(fn (array $result): bool => filled($result['drug_id']))
+                            ->mapWithKeys(fn (array $result): array => [
+                                $result['drug_id'] => $result['display_name'],
+                            ])
+                            ->all();
+                    })
                     ->searchable()
                     ->live()
                     ->dehydrated(false)

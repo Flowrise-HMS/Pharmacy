@@ -19,20 +19,55 @@ class DrugSearchService
     {
         $query = trim($query);
 
+        if (mb_strlen($query) === 0) {
+            return $this->getTopLocalDrugs($limit);
+        }
+
         if (mb_strlen($query) < 2) {
             return [];
         }
 
         $localDrugResults = $this->searchLocalDrugs($query, $limit);
         $localMedicationResults = $this->searchLocalMedications($query, $limit);
-        $externalResults = $this->externalDrugLookupService->search($query, 'rxnorm', $limit);
 
-        return $localDrugResults
-            ->concat($localMedicationResults)
-            ->concat(collect($externalResults))
-            ->take($limit)
-            ->values()
-            ->all();
+        $results = $localDrugResults->concat($localMedicationResults);
+
+        if (config('pharmacy.enable_external_drug_lookup', false)) {
+            $externalResults = collect($this->externalDrugLookupService->search($query, 'rxnorm', $limit));
+            $results = $results->concat($externalResults);
+        }
+
+        return $results->take($limit)->values()->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getTopLocalDrugs(int $limit = 50): array
+    {
+        return Drug::query()
+            ->where('is_active', true)
+            ->orderByDesc('times_prescribed')
+            ->orderByDesc('search_rank')
+            ->limit($limit)
+            ->get()
+            ->map(fn (Drug $drug): array => [
+                'source' => 'local_drug',
+                'source_provider' => $drug->source_provider,
+                'source_identifier' => $drug->source_identifier,
+                'display_name' => $drug->display_name,
+                'generic_name' => $drug->generic_name,
+                'brand_name' => $drug->brand_name,
+                'strength_text' => $drug->strength_text,
+                'dosage_form_text' => $drug->dosage_form_text,
+                'rxnorm_code' => $drug->rxnorm_code,
+                'ndc_code' => $drug->ndc_code,
+                'is_cached_external' => $drug->is_cached_external,
+                'drug_id' => $drug->id,
+                'medication_id' => null,
+                'service_id' => null,
+            ])
+            ->toArray();
     }
 
     /**
