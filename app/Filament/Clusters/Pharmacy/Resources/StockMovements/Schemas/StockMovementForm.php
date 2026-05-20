@@ -6,6 +6,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Context;
+use Modules\Core\Classes\Services\BranchService;
 
 class StockMovementForm
 {
@@ -18,7 +19,7 @@ class StockMovementForm
                     ->relationship('branch', 'name')
                     ->searchable()
                     ->preload()
-                    ->default(Context::get('current_branch_id'))
+                    ->default(app(BranchService::class)->getDefaultBranchId())
                     ->required(),
                 Select::make('medication_id')
                     ->label(__('Medication'))
