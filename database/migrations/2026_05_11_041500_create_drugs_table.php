@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('ndc_code')->nullable();
             $table->text('generic_name');
             $table->text('display_name')->nullable();
-            $table->string('brand_name')->nullable();
+            $table->text('brand_name')->nullable();
             $table->string('strength_text')->nullable();
             $table->string('dosage_form_text')->nullable();
             $table->json('synonyms')->nullable();
