@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Modules\Billing\Enums\PaymentMethod;
+use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Models\Branch;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
@@ -94,8 +95,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     protected function resolveDefaultBranchId(): ?string
     {
-        if (app()->has('currentBranchId')) {
-            return app('currentBranchId');
+        if (app(BranchService::class)->getDefaultBranchId()) {
+            return app(BranchService::class)->getDefaultBranchId();
         }
 
         return Branch::query()->where('is_default', true)->first()?->id;

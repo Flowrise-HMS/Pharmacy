@@ -103,9 +103,6 @@
         <div class="pos-cart-container shrink-0">
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 pos-cart-sticky space-y-4 border border-gray-200 dark:border-gray-700">
                 <div class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">
-                        {{ __('Cart') }}
-                    </h2>
                     <span class="text-sm text-gray-500 dark:text-gray-400">
                         {{ $cart->count() }} {{ trans_choice('item|items', $cart->count()) }}
                     </span>
@@ -148,8 +145,8 @@
                             </div>
                         </div>
                     @empty
-                        <div class="text-center py-10 text-gray-400 dark:text-gray-500">
-                            <x-heroicon-o-shopping-cart class="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <div class="text-center py-10 text-gray-400 dark:text-gray-500 text-center">
+                            <x-heroicon-o-shopping-cart class="w-4 h-4 mx-auto mb-2 opacity-50 text-center" />
                             <p class="text-sm">{{ __('Your cart is empty') }}</p>
                             <p class="text-xs mt-1">{{ __('Use Add on a medication to add it') }}</p>
                         </div>
@@ -197,13 +194,13 @@
 
                     <div class="grid grid-cols-2 gap-3 pt-2">
                         <button type="button" wire:click="processPayment('cash')"
-                            class="px-4 py-3 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="px-4 py-3 text-sm font-bold dark:text-white bg-green-600 rounded-lg hover:bg-green-700 transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             @disabled($cart->isEmpty())>
                             <x-heroicon-m-banknotes class="w-5 h-5" />
                             {{ __('Cash') }}
                         </button>
                         <button type="button" wire:click="processPayment('mobile_money')"
-                            class="px-4 py-3 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="px-4 py-3 text-sm font-bold dark:text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             @disabled($cart->isEmpty())>
                             <x-heroicon-m-credit-card class="w-5 h-5" />
                             {{ __('Mobile money') }}

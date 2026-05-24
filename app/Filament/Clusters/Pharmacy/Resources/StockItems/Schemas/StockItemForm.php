@@ -5,6 +5,7 @@ namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockItems\Schem
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Modules\Core\Classes\Services\BranchService;
 
 class StockItemForm
 {
@@ -23,7 +24,8 @@ class StockItemForm
                     ->relationship('branch', 'name')
                     ->label(__('Branch'))
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->default(app(BranchService::class)->getDefaultBranchId()),
                 TextInput::make('quantity_on_hand')
                     ->numeric()
                     ->required()
@@ -31,6 +33,7 @@ class StockItemForm
                 TextInput::make('reorder_point')
                     ->numeric()
                     ->required()
+                    ->default(1)
                     ->minValue(0),
             ]);
     }
