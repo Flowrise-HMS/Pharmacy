@@ -4,8 +4,11 @@ namespace Modules\Pharmacy\Providers;
 
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Pharmacy\Classes\Services\StockService;
+use Modules\Pharmacy\Console\BackfillMedicationBillingServicesCommand;
 use Modules\Pharmacy\Console\ImportFDANdcDrugData;
 use Modules\Pharmacy\Models\Dispense;
+use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Observers\MedicationObserver;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class PharmacyServiceProvider extends ModuleServiceProvider
@@ -31,12 +34,14 @@ class PharmacyServiceProvider extends ModuleServiceProvider
         parent::boot();
 
         if (class_exists(\Modules\Clinical\Models\RequestItem::class)) {
-        \Modules\Clinical\Models\RequestItem::resolveRelationUsing('dispenses', function ($requestItem) {
-            return $requestItem->hasMany(Dispense::class);
-        });
-    }
-        $this->registerCommands();
+            \Modules\Clinical\Models\RequestItem::resolveRelationUsing('dispenses', function ($requestItem) {
+                return $requestItem->hasMany(Dispense::class);
+            });
+        }
 
+        Medication::observe(MedicationObserver::class);
+
+        $this->registerCommands();
     }
 
      /**
@@ -46,6 +51,7 @@ class PharmacyServiceProvider extends ModuleServiceProvider
     {
         $this->commands([
             ImportFDANdcDrugData::class,
+            BackfillMedicationBillingServicesCommand::class,
         ]);
     }
 }

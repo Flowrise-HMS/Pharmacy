@@ -243,7 +243,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 TextColumn::make('price_stock_row')
                     ->label('')
                     ->formatStateUsing(function (?Medication $record): string {
-                        $price = number_format($record?->service?->price ?? 0, 2);
+                        $service = $record?->billingService();
+                        $price = $service ? number_format((float) $service->price, 2) : '0.00';
                         $qty = (int) ($record?->stockItems?->sum('quantity_on_hand') ?? 0);
                         $badgeClass = $qty > 10
                             ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -253,8 +254,16 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
                         $currency = config('core.default_currency');
 
-                        return '<div class="flex items-center justify-between mt-2">'
-                            ."<span class=\"text-lg font-bold text-primary-600 dark:text-primary-400\">{$currency} {$price}</span>"
+                        $priceHtml = "<span class=\"text-lg font-bold text-primary-600 dark:text-primary-400\">{$currency} {$price}</span>";
+
+                        if (! $service) {
+                            $priceHtml = '<span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">No billing</span>';
+                        } elseif ((float) $service->price <= 0) {
+                            $priceHtml = '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Free</span>';
+                        }
+
+                        return '<div class="flex items-center justify-between gap-2 mt-2">'
+                            .$priceHtml
                             ."<span class=\"text-xs px-2 py-0.5 rounded-full {$badgeClass}\">"
                             .($qty > 0 ? "{$qty} ".__('in stock') : __('Out of stock'))
                             .'</span>'

@@ -17,7 +17,6 @@ use Modules\Billing\Models\InvoiceLine;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
-use Modules\Pharmacy\Classes\Services\DrugMaterializationService;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
 use Modules\Pharmacy\Classes\Services\MedicationService;
@@ -41,7 +40,7 @@ class MedicationOrderAction
                     ->minItems(1)
                     ->schema([
                         Select::make('service_id')
-                            ->label('Medication Service')
+                            ->label('Medication')
                             ->required()
                             ->searchable()
                             ->live()
@@ -94,30 +93,24 @@ class MedicationOrderAction
                                 Select::make('dosage_form')
                                     ->options(DosageForm::class)
                                     ->default(DosageForm::TABLET),
+                                TextInput::make('price')
+                                    ->label('Price (Cash)')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->prefix(config('core.default_currency_symbol', 'GHS'))
+                                    ->placeholder('0.00')
+                                    ->default(0),
                             ])
                             ->createOptionUsing(function (array $data): string {
                                 return app(MedicationService::class)->createWithService($data)->service_id;
                             })
                             ->afterStateUpdated(function ($state, Set $set) {
                                 if (str_starts_with($state, 'drug:')) {
-                                    $drugId = str($state)->after('drug:')->toString();
-                                    $drug = Drug::query()->find($drugId);
-
-                                    if (! $drug) {
-                                        return;
-                                    }
-
-                                    $medication = app(DrugMaterializationService::class)->materialize($drug, [
-                                        'service_name' => $drug->display_name,
-                                        'price' => 0,
-                                        'insurance_price' => 0,
-                                        'is_insurance_covered' => false,
-                                        'is_active' => true,
-                                        'requires_prescription' => true,
-                                        'dosage_form' => 'tablet',
-                                    ]);
-
-                                    $set('service_id', $medication->service_id);
+                                    Notification::make()
+                                        ->title('Drug reference selected')
+                                        ->body('Create a medication from the Pharmacy module to use this drug.')
+                                        ->info()
+                                        ->send();
                                 }
                             }),
                         TextInput::make('quantity')

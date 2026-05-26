@@ -7,6 +7,7 @@ use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
+use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
 use Modules\Pharmacy\Classes\Services\MedicationService;
 use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
@@ -33,6 +34,8 @@ class MedicationImporter extends Importer
             ImportColumn::make('requires_prescription')
                 ->boolean()
                 ->rules(['boolean']),
+            ImportColumn::make('coverage_type')
+                ->rules(['max:50']),
             ImportColumn::make('initial_stock_quantity')
                 ->numeric()
                 ->rules(['integer', 'min:0']),
@@ -86,19 +89,9 @@ class MedicationImporter extends Importer
         $data = array_merge($this->record->getAttributes(), $this->data);
 
         if ($this->record->exists) {
-            // Update existing medication
             $this->record->update(array_intersect_key($data, array_flip((new Medication)->getFillable())));
 
-            // Update associated service
-            if ($this->record->service) {
-                $this->record->service->update([
-                    'price' => $data['price'] ?? $this->record->service->price,
-                    'insurance_price' => $data['insurance_price'] ?? $this->record->service->insurance_price,
-                    'is_insurance_covered' => $data['is_insurance_covered'] ?? $this->record->service->is_insurance_covered,
-                    'requires_prescription' => $data['requires_prescription'] ?? $this->record->service->requires_prescription,
-                    'is_active' => $data['is_active'] ?? $this->record->service->is_active,
-                ]);
-            }
+            app(MedicationBillingSyncService::class)->syncBilling($this->record, $data);
         } else {
             // Create new medication and service
             $this->record = $medicationService->createWithService($data);

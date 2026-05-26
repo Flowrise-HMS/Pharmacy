@@ -46,6 +46,36 @@ class Medication extends Model
         return $this->belongsTo(Service::class);
     }
 
+    public function displayName(): string
+    {
+        $name = $this->brand_name ?: $this->generic_name;
+        $strength = $this->strength;
+
+        return $strength ? "{$name} {$strength}" : ($name ?? '');
+    }
+
+    public function billingService(): ?Service
+    {
+        if ($this->relationLoaded('service')) {
+            return $this->service;
+        }
+
+        return $this->load('service')->service;
+    }
+
+    public function resolveUnitPrice(): string
+    {
+        $service = $this->billingService();
+
+        if (! $service) {
+            throw new \RuntimeException(
+                "{$this->displayName()} is not configured for billing. Set a price in Medications."
+            );
+        }
+
+        return (string) ($service->price ?? '0');
+    }
+
     public function stockItems(): HasMany
     {
         return $this->hasMany(StockItem::class);

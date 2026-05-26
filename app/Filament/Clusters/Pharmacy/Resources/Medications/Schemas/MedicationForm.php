@@ -4,9 +4,11 @@ namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Sche
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Modules\Core\Models\Service;
+use Modules\Core\Enums\CoverageType;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Enums\DosageForm;
@@ -63,19 +65,13 @@ class MedicationForm
                             }
                         }
                     }),
-                Select::make('service_id')
-                    ->label('Service')
-                    ->required()
-                    ->searchable()
-                    ->options(fn () => Service::query()?->orderBy('name')?->pluck('name', 'id')?->toArray()),
                 TextInput::make('generic_name')
                     ->required()
                     ->maxLength(255),
                 TextInput::make('brand_name')
                     ->maxLength(255),
                 Select::make('dosage_form')
-                    ->options(collect(DosageForm::cases())->mapWithKeys(fn ($case) => [$case->value => $case->getLabel()])->toArray())
-                    ->required(),
+                    ->options(collect(DosageForm::cases())->mapWithKeys(fn ($case) => [$case->value => $case->getLabel()])->toArray()),
                 TextInput::make('strength')
                     ->maxLength(255),
                 TextInput::make('rxnorm_code')
@@ -88,6 +84,26 @@ class MedicationForm
                     ->options([1 => 'Active', 0 => 'Inactive'])
                     ->default(1)
                     ->required(),
+                Section::make('Pricing')
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('price')
+                            ->label('Price (Cash)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->prefix(config('core.default_currency_symbol', 'GHS'))
+                            ->placeholder('0.00'),
+                        TextInput::make('insurance_price')
+                            ->hidden()
+                            ->default(0),
+                        Toggle::make('is_insurance_covered')
+                            ->hidden()
+                            ->default(false),
+                        Select::make('coverage_type')
+                            ->hidden()
+                            ->options(CoverageType::class)
+                            ->default(CoverageType::NONE),
+                    ]),
             ]);
     }
 }

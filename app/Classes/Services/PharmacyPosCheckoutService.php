@@ -61,6 +61,14 @@ class PharmacyPosCheckoutService
             if (! isset($medications[$row['medication_id']])) {
                 throw new \InvalidArgumentException("Medication {$row['medication_id']} not found or inactive.");
             }
+
+            $medication = $medications[$row['medication_id']];
+
+            if (! $medication->billingService()) {
+                throw new \InvalidArgumentException(
+                    "{$medication->displayName()} is not configured for billing. Set a price in Medications."
+                );
+            }
         }
 
         foreach ($cart as $row) {
