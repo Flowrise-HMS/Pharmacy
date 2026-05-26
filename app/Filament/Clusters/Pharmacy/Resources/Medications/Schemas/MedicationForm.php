@@ -69,7 +69,7 @@ class MedicationForm
                         }
                     }),
                 Select::make('service_id')
-                    ->label('Billing Service')
+                    ->label('Service')
                     ->relationship('service', 'name')
                     ->searchable()
                     ->preload()
@@ -91,7 +91,7 @@ class MedicationForm
 
                     }),
                 TextInput::make('generic_name')
-                    ->required()
+                    ->nullable()
                     ->maxLength(255),
                 TextInput::make('brand_name')
                     ->maxLength(255),
