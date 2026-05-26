@@ -222,9 +222,9 @@ class PharmacyPos extends Page implements HasActions, HasTable
     {
         return [
             Stack::make([
-                TextColumn::make('name_display')
+                TextColumn::make('price_display')
                     ->label(__('Product'))
-                    ->formatStateUsing(fn (?Medication $record) => $record?->service?->name ?? $record?->generic_name)
+                    ->state(fn (?Medication $record): string => $record?->billingService()?->name ?? $record?->displayName())
                     ->size('lg')
                     ->weight('bold')
                     ->alignStart()
@@ -234,42 +234,30 @@ class PharmacyPos extends Page implements HasActions, HasTable
                     ->alignStart()
                     ->color('gray')
                     ->size('sm')
-                    ->visible(fn (?Medication $record): bool => filled($record?->generic_name) && ($record?->service?->name !== $record?->generic_name)),
+                    ->visible(fn (?Medication $record): bool => filled($record?->generic_name) && ($record?->billingService()?->name !== $record?->generic_name)),
                 TextColumn::make('strength')
                     ->alignStart()
                     ->color('gray')
                     ->size('xs')
                     ->placeholder('—'),
-                TextColumn::make('price_stock_row')
-                    ->label('')
-                    ->formatStateUsing(function (?Medication $record): string {
+                TextColumn::make('stock_display')
+                    ->state(function (?Medication $record): string {
                         $service = $record?->billingService();
                         $price = $service ? number_format((float) $service->price, 2) : '0.00';
-                        $qty = (int) ($record?->stockItems?->sum('quantity_on_hand') ?? 0);
-                        $badgeClass = $qty > 10
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : ($qty > 0
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400');
-
                         $currency = config('core.default_currency');
+                        $qty = (int) ($record?->stockItems?->sum('quantity_on_hand') ?? 0);
 
-                        $priceHtml = "<span class=\"text-lg font-bold text-primary-600 dark:text-primary-400\">{$currency} {$price}</span>";
+                        $priceLabel = match (true) {
+                            ! $service => __('No billing'),
+                            (float) $service->price <= 0 => __('Free'),
+                            default => "{$currency} {$price}",
+                        };
+                        $stockLabel = $qty > 0 ? "{$qty} ".__('in stock') : __('Out of stock');
 
-                        if (! $service) {
-                            $priceHtml = '<span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">No billing</span>';
-                        } elseif ((float) $service->price <= 0) {
-                            $priceHtml = '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Free</span>';
-                        }
-
-                        return '<div class="flex items-center justify-between gap-2 mt-2">'
-                            .$priceHtml
-                            ."<span class=\"text-xs px-2 py-0.5 rounded-full {$badgeClass}\">"
-                            .($qty > 0 ? "{$qty} ".__('in stock') : __('Out of stock'))
-                            .'</span>'
-                            .'</div>';
+                        return "{$priceLabel} | {$stockLabel}";
                     })
-                    ->html(),
+                    ->color(fn (?Medication $record): string => $record?->billingService() ? 'gray' : 'danger')
+                    ->size('sm'),
             ])->extraAttributes(['class' => 'p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition cursor-pointer group']),
         ];
     }
@@ -280,18 +268,19 @@ class PharmacyPos extends Page implements HasActions, HasTable
     protected function getMedicationTableColumns(): array
     {
         return [
-            TextColumn::make('service.name')
+            TextColumn::make('name_display')
                 ->label(__('Name'))
+                ->state(fn (?Medication $record): string => $record?->billingService()?->name ?? $record?->displayName())
                 ->weight('bold')
-                ->description(fn (?Medication $record): ?string => filled($record->service?->name) && $record->generic_name !== $record->service?->name
-                    ? $record->generic_name
-                    : null)
-                ->formatStateUsing(fn (?Medication $record) => $record?->service?->name ?? $record?->generic_name),
+                ->description(fn (?Medication $record): ?string => $record?->billingService()?->name && $record?->displayName() !== $record?->billingService()?->name
+                    ? $record?->displayName()
+                    : null),
             TextColumn::make('strength')
                 ->label(__('Strength'))
                 ->placeholder('—'),
-            TextColumn::make('service.price')
+            TextColumn::make('price')
                 ->label(__('Price'))
+                ->state(fn (?Medication $record): string => $record?->billingService()?->price ?? '0')
                 ->money(config('core.default_currency'))
                 ->alignRight()
                 ->weight('bold'),
