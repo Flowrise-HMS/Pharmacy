@@ -8,7 +8,10 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\CoverageType;
+use Modules\Core\Models\Branch;
+use Modules\Core\Models\Service;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Enums\DosageForm;
@@ -65,6 +68,28 @@ class MedicationForm
                             }
                         }
                     }),
+                Select::make('service_id')
+                    ->label('Billing Service')
+                    ->relationship('service', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->nullable()
+                    ->live()
+                    ->placeholder('Select or leave empty for auto-creation')
+                    ->afterStateUpdated(function ($state, Set $set){
+                        $service = filled($state) ? Service::query()->find($state) : null;
+
+                        if (! $service) {
+                            return;
+                        }
+
+                        $set('generic_name', $service->name);
+                        $set('price', $service->price);
+                        $set('insurance_price', $service->insurance_price);
+                        $set('coverage_type', $service->coverage_type);
+                        $set('is_insurance_covered', $service->is_insurance_covered);
+
+                    }),
                 TextInput::make('generic_name')
                     ->required()
                     ->maxLength(255),
@@ -103,6 +128,22 @@ class MedicationForm
                             ->hidden()
                             ->options(CoverageType::class)
                             ->default(CoverageType::NONE),
+                    ]),
+                Section::make('Initial Stock')
+                    ->visibleOn('create')
+                    ->columns(2)
+                    ->schema([
+                        Select::make('stock_branch_id')
+                            ->label('Branch')
+                            ->options(fn (): array => Branch::query()->pluck('name', 'id')->all())
+                            ->default(fn (): ?string => app(BranchService::class)->getDefaultBranchId())
+                            ->required(),
+                        TextInput::make('initial_quantity')
+                            ->label('Initial Quantity')
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(0)
+                            ->required(),
                     ]),
             ]);
     }

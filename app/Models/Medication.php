@@ -11,6 +11,10 @@ use Modules\Core\Models\Service;
 use Modules\Pharmacy\Database\Factories\MedicationFactory;
 use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Enums\DosageForm;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Modules\Pharmacy\Observers\MedicationObserver;
+
+#[ObservedBy([MedicationObserver::class])]
 
 class Medication extends Model
 {
@@ -48,10 +52,10 @@ class Medication extends Model
 
     public function displayName(): string
     {
-        $name = $this->brand_name ?: $this->generic_name;
+        $name = $this->brand_name ?: ($this->generic_name ?: 'Unspecified');
         $strength = $this->strength;
 
-        return $strength ? "{$name} {$strength}" : ($name ?? '');
+        return $strength ? "{$name} {$strength}" : $name;
     }
 
     public function billingService(): ?Service

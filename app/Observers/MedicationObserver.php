@@ -6,6 +6,13 @@ use Modules\Pharmacy\Models\Medication;
 
 class MedicationObserver
 {
+    public function creating(Medication $medication): void
+    {
+        if (blank($medication->generic_name) && blank($medication->brand_name)) {
+            $medication->generic_name = 'Unspecified';
+        }
+    }
+
     public function saved(Medication $medication): void
     {
         $service = $medication->service;

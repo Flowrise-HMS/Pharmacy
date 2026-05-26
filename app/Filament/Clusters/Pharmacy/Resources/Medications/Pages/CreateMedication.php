@@ -13,6 +13,8 @@ class CreateMedication extends CreateRecord
 
     private array $billingFormData = [];
 
+    private array $stockData = [];
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['insurance_price'] ??= 0;
@@ -23,8 +25,13 @@ class CreateMedication extends CreateRecord
             'price', 'insurance_price', 'is_insurance_covered', 'coverage_type',
         ]);
 
+        $this->stockData = Arr::only($data, [
+            'stock_branch_id', 'initial_quantity',
+        ]);
+
         return Arr::except($data, [
             'price', 'insurance_price', 'is_insurance_covered', 'coverage_type',
+            'stock_branch_id', 'initial_quantity',
         ]);
     }
 
@@ -32,5 +39,12 @@ class CreateMedication extends CreateRecord
     {
         app(MedicationBillingSyncService::class)
             ->ensureBillingService($this->record, $this->billingFormData);
+
+        if (filled($this->stockData['stock_branch_id'] ?? null) && ($this->stockData['initial_quantity'] ?? 0) > 0) {
+            $this->record->stockItems()->create([
+                'branch_id' => $this->stockData['stock_branch_id'],
+                'quantity_on_hand' => (int) $this->stockData['initial_quantity'],
+            ]);
+        }
     }
 }

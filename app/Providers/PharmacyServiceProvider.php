@@ -39,8 +39,6 @@ class PharmacyServiceProvider extends ModuleServiceProvider
             });
         }
 
-        Medication::observe(MedicationObserver::class);
-
         $this->registerCommands();
     }
 
