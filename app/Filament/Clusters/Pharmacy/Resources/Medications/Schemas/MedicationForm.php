@@ -10,6 +10,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\CoverageType;
+use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
@@ -70,7 +71,11 @@ class MedicationForm
                     }),
                 Select::make('service_id')
                     ->label('Service')
-                    ->relationship('service', 'name')
+                    ->relationship(
+                        'service',
+                        'name',
+                        fn ($query) => $query->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value))
+                    )
                     ->searchable()
                     ->preload()
                     ->nullable()

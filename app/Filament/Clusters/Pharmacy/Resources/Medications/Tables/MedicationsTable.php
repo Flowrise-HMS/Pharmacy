@@ -17,12 +17,14 @@ use Filament\Tables\Table;
 use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
+use Modules\Core\Classes\Services\BranchService;
 
 class MedicationsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->withSum('stockItems', 'quantity_on_hand'))
             ->columns([
                 TextColumn::make('#')->rowIndex(),
                 TextColumn::make('display_name')
@@ -32,6 +34,12 @@ class MedicationsTable
                 TextColumn::make('brand_name')->searchable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('dosage_form')->badge(),
                 TextColumn::make('strength'),
+                TextColumn::make('stock_items_sum_quantity_on_hand')
+                    ->label('In Stock')
+                    ->numeric()
+                    ->sortable()
+                    ->default(0)
+                    ->color(fn ($state) => $state > 0 ? 'success' : 'danger'),
                 TextColumn::make('service.price')
                     ->label('Cash price')
                     ->money(config('core.default_currency'))
@@ -63,7 +71,9 @@ class MedicationsTable
                             ->label('Branch')
                             ->required()
                             ->searchable()
-                            ->options(fn () => Branch::query()->active()->orderBy('name')->pluck('name', 'id')->toArray()),
+                            ->options(fn () => Branch::query()?->active()?->orderBy('name')?->pluck('name', 'id')->toArray())
+                            ->preload()
+                            ->default(app(BranchService::class)->getDefaultBranchId()),
                         TextInput::make('quantity')
                             ->label('Quantity')
                             ->required()

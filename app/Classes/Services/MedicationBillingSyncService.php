@@ -4,6 +4,7 @@ namespace Modules\Pharmacy\Classes\Services;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\ServiceCategory;
 use Modules\Pharmacy\Models\Medication;
@@ -13,7 +14,7 @@ final class MedicationBillingSyncService
     public function createMedicationWithBilling(array $medicationData, array $billingData): Medication
     {
         $category = ServiceCategory::query()->firstOrCreate(
-            ['code' => 'MED'],
+            ['code' => ServiceCategoryCode::MED->value],
             [
                 'name' => 'Medications',
                 'description' => 'Medication catalog services',
@@ -89,7 +90,7 @@ final class MedicationBillingSyncService
         }
 
         $category = ServiceCategory::query()->firstOrCreate(
-            ['code' => 'MED'],
+            ['code' => ServiceCategoryCode::MED->value],
             [
                 'name' => 'Medications',
                 'description' => 'Medication catalog services',
