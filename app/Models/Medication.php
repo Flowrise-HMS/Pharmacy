@@ -52,7 +52,13 @@ class Medication extends Model
 
     public function displayName(): string
     {
-        $name = $this->brand_name ?: ($this->generic_name ?: 'Unspecified');
+        $name = "Unspecified";
+        if($this->brand_name){
+            $name .= "Brand: {$this->brand_name}";
+        }
+        if($this->generic_name){
+            $name .= "Generic Name: {$this->generic_name}";
+        }
         $strength = $this->strength;
 
         return $strength ? "{$name} {$strength}" : $name;

@@ -101,7 +101,9 @@ class MedicationForm
                 TextInput::make('brand_name')
                     ->maxLength(255),
                 Select::make('dosage_form')
-                    ->options(collect(DosageForm::cases())->mapWithKeys(fn ($case) => [$case->value => $case->getLabel()])->toArray()),
+                    ->options(collect(DosageForm::cases())->mapWithKeys(fn ($case) => [$case->value => $case->getLabel()])->toArray())
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('strength')
                     ->maxLength(255),
                 TextInput::make('rxnorm_code')
