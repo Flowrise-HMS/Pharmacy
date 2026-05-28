@@ -9,75 +9,79 @@
     <div class="flex flex-col lg:flex-row gap-6 min-h-[85vh]">
         {{-- Catalog + toolbar --}}
         <div class="flex-1 space-y-4 min-w-0">
-            <div class="flex flex-wrap items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="w-full sm:w-auto sm:min-w-[200px]">
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('Branch') }}</label>
-                    <select wire:model.live="selectedBranchId"
-                        class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm py-2 px-3 focus:ring-primary-500 focus:border-primary-500">
-                        <option value="">{{ __('Select branch') }}</option>
-                        @foreach(\Modules\Core\Models\Branch::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id') as $id => $name)
-                            <option value="{{ $id }}">{{ $name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="w-full sm:flex-1 sm:min-w-[220px] relative">
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('Patient') }}</label>
-                    <x-filament::input.wrapper>
-                        <x-filament::input
-                            type="text"
-                            placeholder="{{ __('Search patient…') }}"
-                            wire:model.live.debounce.300ms="patientSearch"
-                            prefix-icon="heroicon-m-user"
-                        />
-                    </x-filament::input.wrapper>
-
-                    @if($patientResults->isNotEmpty())
-                        <div class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            @foreach($patientResults as $result)
-                                <button type="button" wire:click="selectPatient('{{ $result['id'] }}')"
-                                    class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition">
-                                    {{ $result['label'] }}
-                                </button>
+            <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('Branch') }}</label>
+                        <select wire:model.live="selectedBranchId"
+                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm py-2 px-3 focus:ring-primary-500 focus:border-primary-500">
+                            <option value="">{{ __('Select branch') }}</option>
+                            @foreach(\Modules\Core\Models\Branch::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id') as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
-                        </div>
-                    @endif
+                        </select>
+                    </div>
 
-                    @if($selectedPatientId)
-                        @php
-                            $patientModel = class_exists(\Modules\Patient\Models\Patient::class)
-                                ? \Modules\Patient\Models\Patient::find($selectedPatientId)
-                                : null;
-                        @endphp
-                        @if($patientModel)
-                            <div class="mt-1 flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400">
-                                <span>{{ $patientModel->full_name }} ({{ $patientModel->mrn }})</span>
-                                <button type="button" wire:click="selectPatient(null)" class="text-red-500 hover:text-red-700">&times;</button>
+                    <div class="relative">
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('Patient') }}</label>
+                        <x-filament::input.wrapper>
+                            <x-filament::input
+                                type="text"
+                                placeholder="{{ __('Search patient…') }}"
+                                wire:model.live.debounce.300ms="patientSearch"
+                                prefix-icon="heroicon-m-user"
+                            />
+                        </x-filament::input.wrapper>
+
+                        @if($patientResults->isNotEmpty())
+                            <div class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                @foreach($patientResults as $result)
+                                    <button type="button" wire:click="selectPatient('{{ $result['id'] }}')"
+                                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                        {{ $result['label'] }}
+                                    </button>
+                                @endforeach
                             </div>
                         @endif
-                    @else
-                        <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <x-filament::input
-                                type="text"
-                                placeholder="{{ __('Guest name') }}"
-                                wire:model.live.debounce.300ms="guestName"
-                                class="text-sm"
-                            />
-                            <x-filament::input
-                                type="text"
-                                placeholder="{{ __('Guest phone') }}"
-                                wire:model.live.debounce.300ms="guestPhone"
-                                class="text-sm"
-                            />
-                            <x-filament::input
-                                type="email"
-                                placeholder="{{ __('Guest email') }}"
-                                wire:model.live.debounce.300ms="guestEmail"
-                                class="text-sm"
-                            />
-                        </div>
-                    @endif
+
+                        @if($selectedPatientId)
+                            @php
+                                $patientModel = class_exists(\Modules\Patient\Models\Patient::class)
+                                    ? \Modules\Patient\Models\Patient::find($selectedPatientId)
+                                    : null;
+                            @endphp
+                            @if($patientModel)
+                                <div class="mt-1 flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400">
+                                    <span>{{ $patientModel->full_name }} ({{ $patientModel->mrn }})</span>
+                                    <button type="button" wire:click="selectPatient(null)" class="text-red-500 hover:text-red-700">&times;</button>
+                                </div>
+                            @endif
+                        @endif
+                    </div>
                 </div>
+
+                @if(!$selectedPatientId)
+                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <x-filament::input
+                            type="text"
+                            placeholder="{{ __('Guest name') }}"
+                            wire:model.live.debounce.300ms="guestName"
+                            class="text-sm"
+                        />
+                        <x-filament::input
+                            type="text"
+                            placeholder="{{ __('Guest phone') }}"
+                            wire:model.live.debounce.300ms="guestPhone"
+                            class="text-sm"
+                        />
+                        <x-filament::input
+                            type="email"
+                            placeholder="{{ __('Guest email') }}"
+                            wire:model.live.debounce.300ms="guestEmail"
+                            class="text-sm"
+                        />
+                    </div>
+                @endif
             </div>
 
             <x-filament::tabs>
@@ -192,6 +196,11 @@
                         </span>
                     </div>
 
+                    <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer pt-2">
+                        <input type="checkbox" wire:model.live="autoPrintReceipt" class="rounded border-gray-300 dark:border-gray-600 text-primary-600 shadow-sm focus:ring-primary-500" />
+                        {{ __('Auto print receipt after payment') }}
+                    </label>
+
                     <div class="grid grid-cols-2 gap-3 pt-2">
                         <button type="button" wire:click="processPayment('cash')"
                             class="px-4 py-3 text-sm font-bold dark:text-white bg-green-600 rounded-lg hover:bg-green-700 transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -210,4 +219,12 @@
             </div>
         </div>
     </div>
+<script>
+    window.addEventListener('pos-open-receipt', function (event) {
+        var url = event.detail && event.detail.url;
+        if (url) {
+            window.open(url, '_blank', 'noopener');
+        }
+    });
+</script>
 </x-filament-panels::page>

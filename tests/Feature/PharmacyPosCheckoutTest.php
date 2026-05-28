@@ -13,6 +13,7 @@ use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
 use Modules\Pharmacy\Exceptions\InsufficientStockException;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class PharmacyPosCheckoutTest extends TestCase
@@ -287,5 +288,93 @@ class PharmacyPosCheckoutTest extends TestCase
                 ['medication_id' => $medication->id, 'quantity' => 1],
             ],
         ]);
+    }
+
+    public function test_checkout_result_contains_payment_for_receipt_url(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $branch = Branch::factory()->create(['is_active' => true]);
+        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+
+        $service = Service::factory()->create([
+            'category_id' => $category->id,
+            'price' => 25.00,
+            'is_active' => true,
+        ]);
+
+        $medication = Medication::factory()->create([
+            'service_id' => $service->id,
+            'is_active' => true,
+        ]);
+
+        StockItem::factory()->create([
+            'branch_id' => $branch->id,
+            'medication_id' => $medication->id,
+            'quantity_on_hand' => 10,
+        ]);
+
+        $result = app(PharmacyPosCheckoutService::class)->checkout([
+            'branch_id' => $branch->id,
+            'patient_id' => null,
+            'guest_name' => 'Walk-in Customer',
+            'guest_phone' => '233501234567',
+            'currency' => 'GHS',
+            'payment_method' => PaymentMethod::Cash,
+            'cart' => [
+                ['medication_id' => $medication->id, 'quantity' => 1],
+            ],
+        ]);
+
+        $this->assertNotNull($result['payment']->id);
+        $this->assertNotNull($result['invoice']->id);
+        $receiptUrl = route('billing.payments.receipt', ['payment' => $result['payment']]);
+        $this->assertStringContainsString((string) $result['payment']->id, $receiptUrl);
+    }
+
+    public function test_receipt_route_accessible_with_print_permission(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $branch = Branch::factory()->create(['is_active' => true]);
+        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+
+        $service = Service::factory()->create([
+            'category_id' => $category->id,
+            'price' => 25.00,
+            'is_active' => true,
+        ]);
+
+        $medication = Medication::factory()->create([
+            'service_id' => $service->id,
+            'is_active' => true,
+        ]);
+
+        StockItem::factory()->create([
+            'branch_id' => $branch->id,
+            'medication_id' => $medication->id,
+            'quantity_on_hand' => 10,
+        ]);
+
+        $result = app(PharmacyPosCheckoutService::class)->checkout([
+            'branch_id' => $branch->id,
+            'patient_id' => null,
+            'guest_name' => 'Walk-in Customer',
+            'guest_phone' => '233501234567',
+            'currency' => 'GHS',
+            'payment_method' => PaymentMethod::Cash,
+            'cart' => [
+                ['medication_id' => $medication->id, 'quantity' => 1],
+            ],
+        ]);
+
+        Permission::firstOrCreate(['name' => 'print_receipt', 'guard_name' => 'web']);
+        $user->givePermissionTo('print_receipt');
+
+        $response = $this->get(route('billing.payments.receipt', $result['payment']));
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
     }
 }

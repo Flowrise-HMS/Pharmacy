@@ -80,6 +80,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public float $change = 0;
 
+    public bool $autoPrintReceipt = false;
+
     public function mount(): void
     {
         $this->cart = collect();
@@ -484,6 +486,13 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->success()
                 ->send();
 
+            if ($this->autoPrintReceipt && isset($result['payment'])) {
+                $receiptUrl = $this->buildReceiptUrl($result['payment']->id);
+                if ($receiptUrl) {
+                    $this->dispatch('pos-open-receipt', url: $receiptUrl);
+                }
+            }
+
             $this->resetState();
         } catch (\Throwable $e) {
             Notification::make()
@@ -531,6 +540,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
             'amount_paid' => $this->amountPaid,
             'payment_method' => $this->paymentMethod,
             'selected_patient_id' => $this->selectedPatientId,
+            'auto_print_receipt' => $this->autoPrintReceipt,
         ], now()->addHours(1));
     }
 
@@ -551,6 +561,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
             $this->amountPaid = $cached['amount_paid'] ?? null;
             $this->paymentMethod = $cached['payment_method'] ?? PaymentMethod::Cash->value;
             $this->selectedPatientId = $cached['selected_patient_id'] ?? null;
+            $this->autoPrintReceipt = $cached['auto_print_receipt'] ?? false;
         }
 
         if (! $this->cart instanceof Collection) {
@@ -562,6 +573,19 @@ class PharmacyPos extends Page implements HasActions, HasTable
     {
         if ($this->cartCacheKey) {
             Cache::forget($this->cartCacheKey);
+        }
+    }
+
+    protected function buildReceiptUrl($paymentId): ?string
+    {
+        if (! $paymentId) {
+            return null;
+        }
+
+        try {
+            return route('billing.payments.receipt', ['payment' => $paymentId]);
+        } catch (\Throwable) {
+            return null;
         }
     }
 
