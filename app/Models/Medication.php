@@ -52,12 +52,15 @@ class Medication extends Model
 
     public function displayName(): string
     {
-        $name = "Unspecified";
+        $name = "";
         if($this->brand_name){
             $name .= "Brand: {$this->brand_name}";
         }
         if($this->generic_name){
             $name .= "Generic Name: {$this->generic_name}";
+        }
+        if(trim(empty($name))){
+            $name = "Unspecified";
         }
         $strength = $this->strength;
 
