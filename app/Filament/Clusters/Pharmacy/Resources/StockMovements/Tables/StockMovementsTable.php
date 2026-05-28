@@ -2,6 +2,7 @@
 
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Tables;
 
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -11,6 +12,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Context;
+use Modules\Pharmacy\Models\Medication;
 
 class StockMovementsTable
 {
@@ -18,6 +20,7 @@ class StockMovementsTable
     {
         return $table
             ->columns([
+                TextColumn::make('#')->rowIndex(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -57,6 +60,7 @@ class StockMovementsTable
                 SelectFilter::make('medication_id')
                     ->label(__('Medication'))
                     ->relationship('medication', 'generic_name')
+                    ->getOptionLabelFromRecordUsing(fn (Medication $record) => $record?->displayName() ?? 'Unknown')
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('performed_by')
@@ -67,9 +71,11 @@ class StockMovementsTable
                     ->default(auth()->id()),
             ])
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                ActionGroup::make([
+                    ViewAction::make(),
+                    EditAction::make(),
+                    DeleteAction::make(),
+                ])
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

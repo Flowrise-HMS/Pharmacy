@@ -15,6 +15,7 @@ class DrugsTable
     {
         return $table
             ->columns([
+                TextColumn::make('#')->rowIndex(),
                 TextColumn::make('display_name')->searchable()->wrap(),
                 TextColumn::make('generic_name')->searchable(),
                 TextColumn::make('brand_name')->searchable(),

@@ -6,6 +6,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Modules\Core\Classes\Services\BranchService;
+use Modules\Pharmacy\Models\Medication;
 
 class StockItemForm
 {
@@ -18,6 +19,7 @@ class StockItemForm
                     ->searchable()
                     ->label(__('Medication'))
                     ->relationship('medication', 'generic_name')
+                    ->getOptionLabelFromRecordUsing(fn (Medication $record) => $record?->displayName() ?? 'Unknown')
                     ->preload(),
                 Select::make('branch_id')
                     ->required()

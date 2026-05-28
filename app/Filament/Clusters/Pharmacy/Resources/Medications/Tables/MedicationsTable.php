@@ -3,11 +3,12 @@
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Tables;
 
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -54,9 +55,10 @@ class MedicationsTable
                 Action::make('add_stock')
                     ->label('Add Stock')
                     ->icon('heroicon-m-plus-circle')
+                    ->visible(fn () => auth()->user()?->can('create', StockItem::class))
                     ->modalHeading('Add Stock')
                     ->modalDescription(fn (Medication $record) => "Add stock to {$record->displayName()}")
-                    ->form([
+                    ->schema([
                         Select::make('branch_id')
                             ->label('Branch')
                             ->required()
@@ -87,9 +89,11 @@ class MedicationsTable
                             ->body("{$data['quantity']} unit(s) added to {$record->displayName()}")
                             ->send();
                     }),
-                ViewAction::make(),
+               ActionGroup::make([
+                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
+               ])
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

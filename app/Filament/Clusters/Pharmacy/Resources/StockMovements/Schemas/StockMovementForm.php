@@ -7,6 +7,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Context;
 use Modules\Core\Classes\Services\BranchService;
+use Modules\Pharmacy\Models\Medication;
 
 class StockMovementForm
 {
@@ -24,6 +25,7 @@ class StockMovementForm
                 Select::make('medication_id')
                     ->label(__('Medication'))
                     ->relationship('medication', 'generic_name')
+                    ->getOptionLabelFromRecordUsing(fn (Medication $record) => $record?->displayName() ?? 'Unknown')
                     ->searchable()
                     ->preload()
                     ->required(),
