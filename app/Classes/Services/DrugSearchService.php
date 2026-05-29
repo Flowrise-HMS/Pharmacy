@@ -45,7 +45,7 @@ class DrugSearchService
      */
     public function getTopLocalDrugs(int $limit = 50): array
     {
-        return Drug::query()
+        $drugs = Drug::query()
             ->where('is_active', true)
             ->orderByDesc('times_prescribed')
             ->orderByDesc('search_rank')
@@ -66,8 +66,31 @@ class DrugSearchService
                 'drug_id' => $drug->id,
                 'medication_id' => null,
                 'service_id' => null,
-            ])
-            ->toArray();
+            ]);
+
+        $medications = Medication::query()
+            ->where('is_active', true)
+            ->with('service')
+            ->limit(5)
+            ->get()
+            ->map(fn (Medication $med): array => [
+                'source' => 'local_medication',
+                'source_provider' => 'local',
+                'source_identifier' => $med->id,
+                'display_name' => $med->service?->name ?? $med->generic_name,
+                'generic_name' => $med->generic_name,
+                'brand_name' => $med->brand_name,
+                'strength_text' => $med->strength,
+                'dosage_form_text' => $med->dosage_form?->value ?? (string) $med->dosage_form,
+                'rxnorm_code' => $med->rxnorm_code,
+                'ndc_code' => $med->ndc_code,
+                'is_cached_external' => false,
+                'drug_id' => null,
+                'medication_id' => $med->id,
+                'service_id' => $med->service_id,
+            ]);
+
+        return $drugs->concat($medications)->toArray();
     }
 
     /**
