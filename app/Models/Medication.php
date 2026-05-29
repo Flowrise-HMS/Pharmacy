@@ -59,7 +59,7 @@ class Medication extends Model
         if($this->generic_name){
             $name .= "Generic Name: {$this->generic_name}";
         }
-        if(trim(empty($name))){
+        if(empty(trim($name))){
             $name = "Unspecified";
         }
         $strength = $this->strength;
