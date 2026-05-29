@@ -207,6 +207,144 @@ class PharmacyPosCheckoutService
         });
     }
 
+    public function checkoutChargeToAccount(array $data): array
+    {
+        $branchId = $data['branch_id'];
+        if ($branchId === null || $branchId === '') {
+            throw new \InvalidArgumentException('Branch is required for POS checkout.');
+        }
+
+        $patientId = $data['patient_id'] ?? null;
+        if (! $patientId) {
+            throw new \InvalidArgumentException('Patient is required for charge-to-account.');
+        }
+
+        $currency = $data['currency'] ?? config('core.default_currency');
+        $cart = $data['cart'];
+        $posDiscount = PharmacyPosTotals::normalizeMoney($data['pos_discount_amount'] ?? 0);
+
+        Branch::query()->findOrFail($branchId);
+
+        $medicationIds = array_column($cart, 'medication_id');
+        $medications = Medication::query()
+            ->with('service')
+            ->whereIn('id', $medicationIds)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+
+        foreach ($cart as $row) {
+            if (! isset($medications[$row['medication_id']])) {
+                throw new \InvalidArgumentException("Medication {$row['medication_id']} not found or inactive.");
+            }
+            $medication = $medications[$row['medication_id']];
+            if (! $medication->billingService()) {
+                throw new \InvalidArgumentException(
+                    "{$medication->displayName()} is not configured for billing. Set a price in Medications."
+                );
+            }
+        }
+
+        foreach ($cart as $row) {
+            $medication = $medications[$row['medication_id']];
+            if ($medication->controlled_schedule !== null) {
+                throw new \InvalidArgumentException(
+                    "{$medication->service?->name} is a controlled substance and cannot be sold via POS. Use clinical dispensing."
+                );
+            }
+        }
+
+        foreach ($cart as $row) {
+            if (! $this->stockProvider->hasStock($branchId, $row['medication_id'], (int) $row['quantity'])) {
+                throw new InsufficientStockException('Insufficient stock to complete POS sale.');
+            }
+        }
+
+        $lineSubtotals = [];
+        foreach ($cart as $row) {
+            $medication = $medications[$row['medication_id']];
+            $service = $medication->service;
+            $quantity = (int) $row['quantity'];
+            $unitPrice = (string) ($service->price ?? '0');
+            $lineSubtotals[] = bcmul($unitPrice, (string) $quantity, 2);
+        }
+
+        $discounts = $this->distributeDiscountAcrossLines($lineSubtotals, $posDiscount);
+
+        return DB::transaction(function () use ($branchId, $patientId, $currency, $cart, $medications, $data, $discounts, $posDiscount) {
+            $invoice = $this->manualInvoiceService->createStandaloneDraft(
+                branchId: $branchId,
+                patientId: $patientId,
+                currency: $currency,
+                invoiceType: InvoiceType::Standalone,
+            );
+
+            foreach ($cart as $index => $row) {
+                $medication = $medications[$row['medication_id']];
+                $service = $medication->service;
+                $quantity = (int) $row['quantity'];
+                $unitPrice = (string) ($service->price ?? '0');
+                $lineDiscount = $discounts[$index] ?? '0.00';
+                $gross = bcmul($unitPrice, (string) $quantity, 2);
+                $netBeforeTax = bcsub($gross, $lineDiscount, 2);
+                if (bccomp($netBeforeTax, '0', 2) < 0) {
+                    throw new \InvalidArgumentException('Invalid discount for line items.');
+                }
+
+                $lineData = [
+                    'invoice_id' => $invoice->id,
+                    'billable_type' => $medication->getMorphClass(),
+                    'billable_id' => $medication->id,
+                    'service_id' => $service->id,
+                    'description' => $service->name,
+                    'quantity' => (int) $row['quantity'],
+                    'unit_price' => $unitPrice,
+                    'discount_amount' => $lineDiscount,
+                    'tax_amount' => '0',
+                    'amount_paid' => '0',
+                    'line_status' => InvoiceLineStatus::Unpaid,
+                    'patient_responsibility_amount' => $netBeforeTax,
+                    'metadata' => ['source' => 'pharmacy_pos'],
+                ];
+
+                if ($patientId) {
+                    $pricing = $this->insurancePricing->resolveForItem(
+                        patientId: $patientId,
+                        itemType: 'service',
+                        externalCode: (string) $service->id,
+                        fallbackAmount: $gross,
+                    );
+                    $lineData['insurance_expected_amount'] = $pricing['insurer_amount'];
+                    $lineData['patient_responsibility_amount'] = $pricing['patient_amount'];
+                    $lineData['metadata'] = array_merge($lineData['metadata'], [
+                        'insurance_policy_id' => $pricing['policy_id'],
+                        'insurance_payer_id' => $pricing['payer_id'],
+                        'insurance_source_version' => $pricing['source_version'],
+                    ]);
+                }
+
+                InvoiceLine::query()->create($lineData);
+            }
+
+            $invoice = $this->totalsService->recalculate($invoice->fresh(['lines']));
+
+            $invoiceMeta = array_merge((array) ($invoice->metadata ?? []), [
+                'source' => 'pharmacy_pos',
+                'charge_mode' => 'account',
+                'pos_discount_amount' => $posDiscount,
+            ]);
+            $invoice->metadata = $invoiceMeta;
+            $invoice->save();
+
+            $invoice = $this->issuanceService->issue($invoice->fresh(['lines']));
+
+            return [
+                'invoice' => $invoice->fresh(['lines']),
+                'payment' => null,
+            ];
+        });
+    }
+
     /**
      * @param  array<int, string>  $lineSubtotals  Gross line amounts (unit × qty), scale 2
      * @return array<int, string> Discount per line, scale 2

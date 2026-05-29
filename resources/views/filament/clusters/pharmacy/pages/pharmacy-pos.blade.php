@@ -67,21 +67,43 @@
                             placeholder="{{ __('Guest name') }}"
                             wire:model.live.debounce.300ms="guestName"
                             class="text-sm"
+                            @if($chargeMode === 'charge_account') disabled @endif
                         />
                         <x-filament::input
                             type="text"
                             placeholder="{{ __('Guest phone') }}"
                             wire:model.live.debounce.300ms="guestPhone"
                             class="text-sm"
+                            @if($chargeMode === 'charge_account') disabled @endif
                         />
                         <x-filament::input
                             type="email"
                             placeholder="{{ __('Guest email') }}"
                             wire:model.live.debounce.300ms="guestEmail"
                             class="text-sm"
+                            @if($chargeMode === 'charge_account') disabled @endif
                         />
                     </div>
                 @endif
+
+                <div class="mt-3">
+                    <x-filament::tabs>
+                        <x-filament::tabs.item
+                            :active="$chargeMode === 'pay_now'"
+                            wire:click="$set('chargeMode', 'pay_now')"
+                            icon="heroicon-m-banknotes"
+                        >
+                            {{ __('Pay now') }}
+                        </x-filament::tabs.item>
+                        <x-filament::tabs.item
+                            :active="$chargeMode === 'charge_account'"
+                            wire:click="$set('chargeMode', 'charge_account')"
+                            icon="heroicon-m-clock"
+                        >
+                            {{ __('Charge to account') }}
+                        </x-filament::tabs.item>
+                    </x-filament::tabs>
+                </div>
             </div>
 
             <x-filament::tabs>

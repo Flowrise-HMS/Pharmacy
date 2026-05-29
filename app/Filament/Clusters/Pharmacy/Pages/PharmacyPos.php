@@ -82,6 +82,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public bool $autoPrintReceipt = false;
 
+    public string $chargeMode = 'pay_now';
+
     public function mount(): void
     {
         $this->cart = collect();
@@ -459,6 +461,12 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
+        if ($this->chargeMode === 'charge_account') {
+            $this->checkoutChargeToAccount();
+
+            return;
+        }
+
         try {
             $amountTendered = $this->amountPaid !== null && $this->amountPaid !== ''
                 ? PharmacyPosTotals::normalizeMoney($this->amountPaid)
@@ -497,6 +505,58 @@ class PharmacyPos extends Page implements HasActions, HasTable
         } catch (\Throwable $e) {
             Notification::make()
                 ->title(__('Checkout failed'))
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function checkoutChargeToAccount(): void
+    {
+        if (! $this->selectedPatientId) {
+            Notification::make()
+                ->danger()
+                ->title(__('Patient required'))
+                ->body(__('A patient must be selected for charge-to-account.'))
+                ->send();
+
+            return;
+        }
+
+        try {
+            $discountStr = PharmacyPosTotals::normalizeMoney($this->discount);
+
+            $result = app(PharmacyPosCheckoutService::class)->checkoutChargeToAccount([
+                'branch_id' => $this->selectedBranchId,
+                'patient_id' => $this->selectedPatientId,
+                'currency' => config('core.default_currency'),
+                'cart' => $this->cart->map(fn ($item) => [
+                    'medication_id' => $item['id'],
+                    'quantity' => $item['quantity'],
+                ])->values()->toArray(),
+                'pos_discount_amount' => $discountStr,
+            ]);
+
+            $invoice = $result['invoice'];
+
+            $billingDeskUrl = \Modules\Billing\Filament\Clusters\Billing\Pages\BillingDesk::getUrl(['invoice' => $invoice->id]);
+
+            Notification::make()
+                ->title(__('Charge created'))
+                ->body(__('Invoice :number sent to billing desk.', ['number' => $invoice->invoice_number]))
+                ->success()
+                ->actions([
+                    Action::make('open_billing')
+                        ->label(__('Open in Billing Desk'))
+                        ->button()
+                        ->url($billingDeskUrl),
+                ])
+                ->send();
+
+            $this->resetState();
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title(__('Charge failed'))
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
