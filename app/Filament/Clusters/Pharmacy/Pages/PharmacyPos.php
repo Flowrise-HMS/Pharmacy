@@ -6,6 +6,7 @@ use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
@@ -13,6 +14,8 @@ use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -82,7 +85,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public bool $autoPrintReceipt = false;
 
-    public string $chargeMode = 'pay_now';
+    public string $chargeMode = 'charge_account';
 
     public function mount(): void
     {
@@ -449,6 +452,16 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
+        if (! $this->selectedPatientId && blank($this->guestName) && blank($this->guestPhone)) {
+            Notification::make()
+                ->danger()
+                ->title(__('Owner required'))
+                ->body(__('Select a patient or enter the guest name / phone.'))
+                ->send();
+
+            return;
+        }
+
         $subtotal = PharmacyPosTotals::cartSubtotal($this->cart);
         $discountStr = PharmacyPosTotals::normalizeMoney($this->discount);
         if (bccomp($discountStr, $subtotal, 2) > 0) {
@@ -513,22 +526,15 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function checkoutChargeToAccount(): void
     {
-        if (! $this->selectedPatientId) {
-            Notification::make()
-                ->danger()
-                ->title(__('Patient required'))
-                ->body(__('A patient must be selected for charge-to-account.'))
-                ->send();
-
-            return;
-        }
-
         try {
             $discountStr = PharmacyPosTotals::normalizeMoney($this->discount);
 
             $result = app(PharmacyPosCheckoutService::class)->checkoutChargeToAccount([
                 'branch_id' => $this->selectedBranchId,
                 'patient_id' => $this->selectedPatientId,
+                'guest_name' => $this->selectedPatientId ? null : $this->guestName,
+                'guest_phone' => $this->selectedPatientId ? null : $this->guestPhone,
+                'guest_email' => $this->selectedPatientId ? null : $this->guestEmail,
                 'currency' => config('core.default_currency'),
                 'cart' => $this->cart->map(fn ($item) => [
                     'medication_id' => $item['id'],

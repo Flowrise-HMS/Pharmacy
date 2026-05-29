@@ -215,9 +215,6 @@ class PharmacyPosCheckoutService
         }
 
         $patientId = $data['patient_id'] ?? null;
-        if (! $patientId) {
-            throw new \InvalidArgumentException('Patient is required for charge-to-account.');
-        }
 
         $currency = $data['currency'] ?? config('core.default_currency');
         $cart = $data['cart'];
@@ -278,6 +275,13 @@ class PharmacyPosCheckoutService
                 currency: $currency,
                 invoiceType: InvoiceType::Standalone,
             );
+
+            if (! $patientId) {
+                $invoice->guest_name = $data['guest_name'] ?? null;
+                $invoice->guest_phone = $data['guest_phone'] ?? null;
+                $invoice->guest_email = $data['guest_email'] ?? null;
+                $invoice->save();
+            }
 
             foreach ($cart as $index => $row) {
                 $medication = $medications[$row['medication_id']];

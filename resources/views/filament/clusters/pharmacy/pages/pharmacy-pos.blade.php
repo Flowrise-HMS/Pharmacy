@@ -67,21 +67,18 @@
                             placeholder="{{ __('Guest name') }}"
                             wire:model.live.debounce.300ms="guestName"
                             class="text-sm"
-                            @if($chargeMode === 'charge_account') disabled @endif
                         />
                         <x-filament::input
                             type="text"
                             placeholder="{{ __('Guest phone') }}"
                             wire:model.live.debounce.300ms="guestPhone"
                             class="text-sm"
-                            @if($chargeMode === 'charge_account') disabled @endif
                         />
                         <x-filament::input
                             type="email"
                             placeholder="{{ __('Guest email') }}"
                             wire:model.live.debounce.300ms="guestEmail"
                             class="text-sm"
-                            @if($chargeMode === 'charge_account') disabled @endif
                         />
                     </div>
                 @endif
@@ -100,7 +97,7 @@
                             wire:click="$set('chargeMode', 'charge_account')"
                             icon="heroicon-m-clock"
                         >
-                            {{ __('Charge to account') }}
+                            {{ __('Post to account') }}
                         </x-filament::tabs.item>
                     </x-filament::tabs>
                 </div>
@@ -199,44 +196,58 @@
                         </span>
                     </div>
 
-                    <div class="flex items-center justify-between gap-2">
-                        <label class="text-sm text-gray-600 dark:text-gray-400">{{ __('Amount paid') }}</label>
-                        <x-filament::input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            wire:model.live.debounce.500ms="amountPaid"
-                            placeholder="0.00"
-                            class="w-28 text-right text-sm"
-                        />
-                    </div>
+                    @if ($chargeMode === 'pay_now')
+                        <div class="flex items-center justify-between gap-2">
+                            <label class="text-sm text-gray-600 dark:text-gray-400">{{ __('Amount paid') }}</label>
+                            <x-filament::input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                wire:model.live.debounce.500ms="amountPaid"
+                                placeholder="0.00"
+                                class="w-28 text-right text-sm"
+                            />
+                        </div>
 
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="text-gray-600 dark:text-gray-400">{{ __('Change') }}</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">
-                            {{ config('core.default_currency') }} {{ number_format($change, 2) }}
-                        </span>
-                    </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600 dark:text-gray-400">{{ __('Change') }}</span>
+                            <span class="font-semibold text-gray-900 dark:text-white">
+                                {{ config('core.default_currency') }} {{ number_format($change, 2) }}
+                            </span>
+                        </div>
+                    @endif
 
                     <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer pt-2">
                         <input type="checkbox" wire:model.live="autoPrintReceipt" class="rounded border-gray-300 dark:border-gray-600 text-primary-600 shadow-sm focus:ring-primary-500" />
                         {{ __('Auto print receipt after payment') }}
                     </label>
 
-                    <div class="grid grid-cols-2 gap-3 pt-2">
-                        <button type="button" wire:click="processPayment('cash')"
-                            class="px-4 py-3 text-sm font-bold dark:text-white bg-green-600 rounded-lg hover:bg-green-700 transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            @disabled($cart->isEmpty())>
-                            <x-heroicon-m-banknotes class="w-5 h-5" />
-                            {{ __('Cash') }}
-                        </button>
-                        <button type="button" wire:click="processPayment('mobile_money')"
-                            class="px-4 py-3 text-sm font-bold dark:text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            @disabled($cart->isEmpty())>
-                            <x-heroicon-m-credit-card class="w-5 h-5" />
-                            {{ __('Mobile money') }}
-                        </button>
-                    </div>
+                    @if ($chargeMode === 'pay_now')
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('Payment method') }}</label>
+                            <select wire:model.live="paymentMethod"
+                                class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm py-2 px-3 focus:ring-primary-500 focus:border-primary-500"
+                                @disabled($cart->isEmpty())>
+                                <option value="cash">{{ __('Cash') }}</option>
+                                <option value="card">{{ __('Card') }}</option>
+                                <option value="bank_transfer">{{ __('Bank Transfer') }}</option>
+                                <option value="mobile_money">{{ __('Mobile Money') }}</option>
+                            </select>
+                        </div>
+                    @endif
+
+                    <button type="button" wire:click="checkout"
+                        class="w-full px-4 py-3 text-sm font-bold dark:text-white rounded-lg transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed
+                            {{ $chargeMode === 'pay_now' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700' }}"
+                        @disabled($cart->isEmpty())>
+                        @if ($chargeMode === 'pay_now')
+                            <x-heroicon-m-currency-dollar class="w-5 h-5" />
+                            {{ __('Dispense & Checkout') }}
+                        @else
+                            <x-heroicon-m-arrow-right-on-rectangle class="w-5 h-5" />
+                            {{ __('Send to Billing') }}
+                        @endif
+                    </button>
                 </div>
             </div>
         </div>
