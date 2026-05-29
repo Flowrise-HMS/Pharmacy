@@ -24,6 +24,7 @@ use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Enums\MedicationRoute;
 use Modules\Pharmacy\Models\Drug;
+use Modules\Pharmacy\Models\Medication;
 
 class MedicationOrderAction
 {
@@ -61,6 +62,12 @@ class MedicationOrderAction
                                             ];
                                         }
 
+                                        if (filled($result['medication_id'])) {
+                                            return [
+                                                'medication:'.$result['medication_id'] => $result['display_name'],
+                                            ];
+                                        }
+
                                         return [];
                                     })
                                     ->all();
@@ -77,6 +84,13 @@ class MedicationOrderAction
                                     $prefix = $drug->source_provider === 'local' ? '[Reference] ' : '[External] ';
 
                                     return $prefix.$drug->display_name;
+                                }
+
+                                if (str_starts_with($value, 'medication:')) {
+                                    $medicationId = str($value)->after('medication:')->toString();
+                                    $medication = Medication::find($medicationId);
+
+                                    return $medication?->service?->name ?? $medication?->generic_name ?? $value;
                                 }
 
                                 return Service::find($value)?->name;
