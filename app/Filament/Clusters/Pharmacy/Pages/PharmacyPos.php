@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Session;
 use Modules\Billing\Enums\PaymentMethod;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Models\Branch;
+use Modules\Core\Models\Service;
+use Modules\Core\Models\ServiceCategory;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
 use Modules\Pharmacy\Classes\Support\PharmacyPosTotals;
@@ -87,6 +89,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public string $chargeMode = 'charge_account';
 
+    public string $activeTab = 'medications';
+
     public function mount(): void
     {
         $this->cart = collect();
@@ -94,6 +98,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->paymentMethod = PaymentMethod::Cash->value;
         $this->viewModeSessionKey = Auth::id().'_pharmacy_pos_view_mode';
         $this->viewMode = Session::get($this->viewModeSessionKey, 'card');
+        $this->activeTab = Session::get('pharmacy_pos_active_tab', 'medications');
         $this->selectedBranchId = $this->resolveDefaultBranchId();
         $this->cartCacheKey = 'pharmacy_pos_user_'.Auth::id().'_branch_'.($this->selectedBranchId ?? 'default');
         $this->restoreCartFromCache();
@@ -129,6 +134,17 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->calculateGrandTotal();
         $this->clearCartCache();
         $this->resetTable();
+    }
+
+    public function updatedActiveTab($value): void
+    {
+        Session::put('pharmacy_pos_active_tab', $value);
+        $this->resetTable();
+    }
+
+    public function updatedChargeMode($value): void
+    {
+        $this->saveCartToCache();
     }
 
     public function updatedGuestName(): void
@@ -175,6 +191,15 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function table(Table $table): Table
     {
+        if ($this->activeTab === 'services') {
+            return $this->makeServicesTable($table);
+        }
+
+        return $this->makeMedicationsTable($table);
+    }
+
+    protected function makeMedicationsTable(Table $table): Table
+    {
         return $table
             ->query($this->medicationsTableQuery())
             ->defaultSort('generic_name')
@@ -201,6 +226,35 @@ class PharmacyPos extends Page implements HasActions, HasTable
             ->actions([
                 Action::make('add_to_cart')
                     ->action(fn (Medication $record) => $this->addToCart($record->id)),
+            ]);
+    }
+
+    protected function makeServicesTable(Table $table): Table
+    {
+        return $table
+            ->query(Service::query()
+                ->where('is_active', true)
+                ->where('is_billable', true)
+                ->whereHas('category', fn ($q) => $q->where('code', '!=', 'MED'))
+                ->with('category'))
+            ->defaultSort('name')
+            ->paginationPageOptions([12, 24, 48])
+            ->searchPlaceholder(__('Search services…'))
+            ->searchable()
+            ->searchUsing(function (Builder $query, string $search): void {
+                $query->where(function (Builder $q) use ($search): void {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhereHas('category', fn (Builder $cq) => $cq->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->columns($this->viewMode === 'card' ? $this->getServiceCardColumns() : $this->getServiceTableColumns())
+            ->contentGrid($this->viewMode === 'card' ? ['md' => 2, 'xl' => 3] : null)
+            ->emptyStateHeading(__('No services available'))
+            ->emptyStateDescription(__('No active billable services found.'))
+            ->recordAction('add_service_to_cart')
+            ->actions([
+                Action::make('add_service_to_cart')
+                    ->action(fn (Service $record) => $this->addServiceToCart($record->id)),
             ]);
     }
 
@@ -269,6 +323,54 @@ class PharmacyPos extends Page implements HasActions, HasTable
                     ->color(fn (?Medication $record): string => $record?->billingService() ? 'gray' : 'danger')
                     ->size('sm'),
             ])->extraAttributes(['class' => 'p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition cursor-pointer group']),
+        ];
+    }
+
+    /**
+     * @return array<int, Stack|TextColumn>
+     */
+    protected function getServiceCardColumns(): array
+    {
+        return [
+            Stack::make([
+                TextColumn::make('name')
+                    ->label(__('Service'))
+                    ->size('lg')
+                    ->weight('bold')
+                    ->alignStart()
+                    ->extraAttributes(['class' => 'group-hover:text-primary-600 dark:group-hover:text-primary-400 transition']),
+                TextColumn::make('category.name')
+                    ->label(__('Category'))
+                    ->alignStart()
+                    ->color('gray')
+                    ->size('sm'),
+                TextColumn::make('price_display')
+                    ->state(fn (Service $record): string => number_format((float) $record->price, 2))
+                    ->color('gray')
+                    ->size('sm'),
+            ])->extraAttributes(['class' => 'p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition cursor-pointer group']),
+        ];
+    }
+
+    /**
+     * @return array<int, TextColumn>
+     */
+    protected function getServiceTableColumns(): array
+    {
+        return [
+            TextColumn::make('name')
+                ->label(__('Name'))
+                ->weight('bold')
+                ->searchable(),
+            TextColumn::make('category.name')
+                ->label(__('Category'))
+                ->badge()
+                ->color('gray'),
+            TextColumn::make('price')
+                ->label(__('Price'))
+                ->money(config('core.default_currency'))
+                ->alignRight()
+                ->weight('bold'),
         ];
     }
 
@@ -344,8 +446,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
-        if ($this->cart->has($medicationId)) {
-            $item = $this->cart->get($medicationId);
+        $key = 'm'.$medication->id;
+
+        if ($this->cart->has($key)) {
+            $item = $this->cart->get($key);
             if ($item['quantity'] >= $stockQty) {
                 Notification::make()
                     ->danger()
@@ -355,9 +459,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 return;
             }
             $item['quantity']++;
-            $this->cart->put($medicationId, $item);
+            $this->cart->put($key, $item);
         } else {
-            $this->cart[$medicationId] = [
+            $this->cart[$key] = [
+                'type' => 'medication',
                 'id' => $medication->id,
                 'name' => $medication->service?->name ?? $medication->generic_name,
                 'generic_name' => $medication->generic_name,
@@ -372,6 +477,35 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->saveCartToCache();
     }
 
+    public function addServiceToCart($serviceId): void
+    {
+        $service = Service::query()
+            ->where('is_active', true)
+            ->where('is_billable', true)
+            ->with('category')
+            ->findOrFail($serviceId);
+
+        $key = 's'.$service->id;
+
+        if ($this->cart->has($key)) {
+            $item = $this->cart->get($key);
+            $item['quantity']++;
+            $this->cart->put($key, $item);
+        } else {
+            $this->cart[$key] = [
+                'type' => 'service',
+                'id' => $service->id,
+                'name' => $service->name,
+                'category' => $service->category?->name,
+                'price' => (float) ($service->price ?? 0),
+                'quantity' => 1,
+            ];
+        }
+
+        $this->calculateGrandTotal();
+        $this->saveCartToCache();
+    }
+
     public function updateQuantity($id, $quantity): void
     {
         if (! $this->cart->has($id)) {
@@ -379,22 +513,24 @@ class PharmacyPos extends Page implements HasActions, HasTable
         }
 
         $quantity = max(1, (int) $quantity);
+        $item = $this->cart->get($id);
 
-        $stockQty = StockItem::query()
-            ->where('medication_id', $id)
-            ->where('branch_id', $this->selectedBranchId)
-            ->sum('quantity_on_hand');
+        if (($item['type'] ?? 'medication') === 'medication') {
+            $stockQty = StockItem::query()
+                ->where('medication_id', $item['id'])
+                ->where('branch_id', $this->selectedBranchId)
+                ->sum('quantity_on_hand');
 
-        if ($quantity > $stockQty) {
-            Notification::make()
-                ->danger()
-                ->title(__('Insufficient stock'))
-                ->send();
+            if ($quantity > $stockQty) {
+                Notification::make()
+                    ->danger()
+                    ->title(__('Insufficient stock'))
+                    ->send();
 
-            return;
+                return;
+            }
         }
 
-        $item = $this->cart->get($id);
         $item['quantity'] = $quantity;
         $this->cart->put($id, $item);
         $this->calculateGrandTotal();
@@ -504,7 +640,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'guest_email' => $this->selectedPatientId ? null : $this->guestEmail,
                 'currency' => config('core.default_currency'),
                 'cart' => $this->cart->map(fn ($item) => [
-                    'medication_id' => $item['id'],
+                    'type' => $item['type'] ?? 'medication',
+                    'id' => $item['id'],
                     'quantity' => $item['quantity'],
                 ])->values()->toArray(),
                 'payment_method' => PaymentMethod::from($this->paymentMethod),
@@ -518,8 +655,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->success()
                 ->send();
 
-            if ($this->autoPrintReceipt && isset($result['payment'])) {
-                $receiptUrl = $this->buildReceiptUrl($result['payment']->id);
+            if ($this->autoPrintReceipt) {
+                $receiptUrl = isset($result['payment'])
+                    ? $this->buildReceiptUrl($result['payment']->id)
+                    : $this->buildInvoiceUrl($result['invoice']->id);
                 if ($receiptUrl) {
                     $this->dispatch('pos-open-receipt', url: $receiptUrl);
                 }
@@ -548,7 +687,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'guest_email' => $this->selectedPatientId ? null : $this->guestEmail,
                 'currency' => config('core.default_currency'),
                 'cart' => $this->cart->map(fn ($item) => [
-                    'medication_id' => $item['id'],
+                    'type' => $item['type'] ?? 'medication',
+                    'id' => $item['id'],
                     'quantity' => $item['quantity'],
                 ])->values()->toArray(),
                 'pos_discount_amount' => $discountStr,
@@ -569,6 +709,13 @@ class PharmacyPos extends Page implements HasActions, HasTable
                         ->url($billingDeskUrl),
                 ])
                 ->send();
+
+            if ($this->autoPrintReceipt) {
+                $invoiceUrl = $this->buildInvoiceUrl($invoice->id);
+                if ($invoiceUrl) {
+                    $this->dispatch('pos-open-receipt', url: $invoiceUrl);
+                }
+            }
 
             $this->resetState();
         } catch (\Throwable $e) {
@@ -664,6 +811,24 @@ class PharmacyPos extends Page implements HasActions, HasTable
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    protected function buildInvoiceUrl($invoiceId): ?string
+    {
+        if (! $invoiceId) {
+            return null;
+        }
+
+        try {
+            return route('billing.invoices.pdf', ['invoice' => $invoiceId]);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    public function canCreatePayment(): bool
+    {
+        return auth()->user()?->can('create', \Modules\Billing\Models\Payment::class) ?? false;
     }
 
     protected function getHeaderActions(): array

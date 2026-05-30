@@ -64,7 +64,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'currency' => 'GHS',
             'payment_method' => PaymentMethod::Cash,
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 2],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 2],
             ],
         ]);
 
@@ -123,7 +123,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'currency' => 'GHS',
             'payment_method' => PaymentMethod::Cash,
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 1],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 1],
             ],
         ]);
     }
@@ -161,7 +161,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'currency' => 'GHS',
             'payment_method' => PaymentMethod::Cash,
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 5],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 5],
             ],
         ]);
     }
@@ -200,7 +200,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'payment_method' => PaymentMethod::Cash,
             'pos_discount_amount' => '5.00',
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 2],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 2],
             ],
         ]);
 
@@ -245,7 +245,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'payment_method' => PaymentMethod::Cash,
             'pos_discount_amount' => '25.00',
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 2],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 2],
             ],
         ]);
     }
@@ -285,7 +285,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'payment_method' => PaymentMethod::Cash,
             'amount_tendered' => '10.00',
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 1],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 1],
             ],
         ]);
     }
@@ -323,7 +323,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'currency' => 'GHS',
             'payment_method' => PaymentMethod::Cash,
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 1],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 1],
             ],
         ]);
 
@@ -366,7 +366,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'currency' => 'GHS',
             'payment_method' => PaymentMethod::Cash,
             'cart' => [
-                ['medication_id' => $medication->id, 'quantity' => 1],
+                ['type' => 'medication', 'id' => $medication->id, 'quantity' => 1],
             ],
         ]);
 

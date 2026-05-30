@@ -9,6 +9,23 @@
     <div class="flex flex-col lg:flex-row gap-6 min-h-[85vh]">
         {{-- Catalog + toolbar --}}
         <div class="flex-1 space-y-4 min-w-0">
+            <x-filament::tabs>
+                <x-filament::tabs.item
+                    :active="$activeTab === 'medications'"
+                    wire:click="$set('activeTab', 'medications')"
+                    icon="heroicon-m-cube"
+                >
+                    {{ __('Medications') }}
+                </x-filament::tabs.item>
+                <x-filament::tabs.item
+                    :active="$activeTab === 'services'"
+                    wire:click="$set('activeTab', 'services')"
+                    icon="heroicon-m-clipboard-document-list"
+                >
+                    {{ __('Services') }}
+                </x-filament::tabs.item>
+            </x-filament::tabs>
+
             <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     <div>
@@ -82,25 +99,6 @@
                         />
                     </div>
                 @endif
-
-                <div class="mt-3">
-                    <x-filament::tabs>
-                        <x-filament::tabs.item
-                            :active="$chargeMode === 'pay_now'"
-                            wire:click="$set('chargeMode', 'pay_now')"
-                            icon="heroicon-m-banknotes"
-                        >
-                            {{ __('Pay now') }}
-                        </x-filament::tabs.item>
-                        <x-filament::tabs.item
-                            :active="$chargeMode === 'charge_account'"
-                            wire:click="$set('chargeMode', 'charge_account')"
-                            icon="heroicon-m-clock"
-                        >
-                            {{ __('Post to account') }}
-                        </x-filament::tabs.item>
-                    </x-filament::tabs>
-                </div>
             </div>
 
             <x-filament::tabs>
@@ -171,7 +169,7 @@
                         <div class="text-center py-10 text-gray-400 dark:text-gray-500 text-center">
                             <x-heroicon-o-shopping-cart class="w-4 h-4 mx-auto mb-2 opacity-50 text-center" />
                             <p class="text-sm">{{ __('Your cart is empty') }}</p>
-                            <p class="text-xs mt-1">{{ __('Use Add on a medication to add it') }}</p>
+                            <p class="text-xs mt-1">{{ __('Click a medication or service to add it to the cart') }}</p>
                         </div>
                     @endforelse
                 </div>
@@ -194,6 +192,23 @@
                         <span class="text-xl font-extrabold text-primary-600 dark:text-primary-400">
                             {{ config('core.default_currency') }} {{ number_format($grandTotal, 2) }}
                         </span>
+                    </div>
+
+                    <div class="flex items-center gap-4 pt-1">
+                        @if($this->canCreatePayment())
+                            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <input type="radio" wire:model.live="chargeMode" value="pay_now"
+                                    class="text-primary-600 focus:ring-primary-500"
+                                    @disabled($cart->isEmpty()) />
+                                <span class="text-gray-700 dark:text-gray-300">{{ __('Pay now') }}</span>
+                            </label>
+                        @endif
+                        <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                            <input type="radio" wire:model.live="chargeMode" value="charge_account"
+                                class="text-primary-600 focus:ring-primary-500"
+                                @disabled($cart->isEmpty()) />
+                            <span class="text-gray-700 dark:text-gray-300">{{ __('Post to account') }}</span>
+                        </label>
                     </div>
 
                     @if ($chargeMode === 'pay_now')

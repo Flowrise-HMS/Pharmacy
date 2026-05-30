@@ -15,6 +15,7 @@ use Modules\Billing\Services\PaymentRecordingService;
 use Modules\Core\Contracts\InsurancePricingResolver;
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Core\Models\Branch;
+use Modules\Core\Models\Service;
 use Modules\Pharmacy\Classes\Support\PharmacyPosTotals;
 use Modules\Pharmacy\Exceptions\InsufficientStockException;
 use Modules\Pharmacy\Models\Medication;
@@ -49,55 +50,80 @@ class PharmacyPosCheckoutService
 
         Branch::query()->findOrFail($branchId);
 
-        $medicationIds = array_column($cart, 'medication_id');
-        $medications = Medication::query()
-            ->with(['service', 'billingUnit'])
-            ->whereIn('id', $medicationIds)
-            ->where('is_active', true)
-            ->get()
-            ->keyBy('id');
+        $medRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'medication');
+        $svcRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'service');
 
-        foreach ($cart as $row) {
-            if (! isset($medications[$row['medication_id']])) {
-                throw new \InvalidArgumentException("Medication {$row['medication_id']} not found or inactive.");
+        $medications = collect();
+        if (! empty($medRows)) {
+            $medIds = array_column($medRows, 'id');
+            $medications = Medication::query()
+                ->with(['service', 'billingUnit'])
+                ->whereIn('id', $medIds)
+                ->where('is_active', true)
+                ->get()
+                ->keyBy('id');
+
+            foreach ($medRows as $row) {
+                if (! isset($medications[$row['id']])) {
+                    throw new \InvalidArgumentException("Medication {$row['id']} not found or inactive.");
+                }
+                $medication = $medications[$row['id']];
+                if (! $medication->billingService()) {
+                    throw new \InvalidArgumentException(
+                        "{$medication->displayName()} is not configured for billing. Set a price in Medications."
+                    );
+                }
             }
 
-            $medication = $medications[$row['medication_id']];
+            foreach ($medRows as $row) {
+                if (! $this->stockProvider->hasStock($branchId, $row['id'], (int) $row['quantity'])) {
+                    throw new InsufficientStockException('Insufficient stock to complete POS sale.');
+                }
+            }
 
-            if (! $medication->billingService()) {
-                throw new \InvalidArgumentException(
-                    "{$medication->displayName()} is not configured for billing. Set a price in Medications."
-                );
+            foreach ($medRows as $row) {
+                $medication = $medications[$row['id']];
+                if ($medication->controlled_schedule !== null) {
+                    throw new \InvalidArgumentException(
+                        "{$medication->service?->name} is a controlled substance and cannot be sold via POS. Use clinical dispensing."
+                    );
+                }
             }
         }
 
-        foreach ($cart as $row) {
-            if (! $this->stockProvider->hasStock($branchId, $row['medication_id'], (int) $row['quantity'])) {
-                throw new InsufficientStockException('Insufficient stock to complete POS sale.');
-            }
-        }
+        $services = collect();
+        if (! empty($svcRows)) {
+            $svcIds = array_column($svcRows, 'id');
+            $services = Service::query()
+                ->whereIn('id', $svcIds)
+                ->where('is_active', true)
+                ->where('is_billable', true)
+                ->get()
+                ->keyBy('id');
 
-        foreach ($cart as $row) {
-            $medication = $medications[$row['medication_id']];
-            if ($medication->controlled_schedule !== null) {
-                throw new \InvalidArgumentException(
-                    "{$medication->service?->name} is a controlled substance and cannot be sold via POS. Use clinical dispensing."
-                );
+            foreach ($svcRows as $row) {
+                if (! isset($services[$row['id']])) {
+                    throw new \InvalidArgumentException("Service {$row['id']} not found or inactive.");
+                }
             }
         }
 
         $lineSubtotals = [];
         foreach ($cart as $row) {
-            $medication = $medications[$row['medication_id']];
-            $service = $medication->service;
-            $quantity = (int) $row['quantity'];
-            $unitPrice = (string) ($service->price ?? '0');
-            $lineSubtotals[] = bcmul($unitPrice, (string) $quantity, 2);
+            $isMed = ($row['type'] ?? 'medication') === 'medication';
+            if ($isMed) {
+                $medication = $medications[$row['id']];
+                $unitPrice = (string) ($medication->service->price ?? '0');
+            } else {
+                $svc = $services[$row['id']];
+                $unitPrice = (string) ($svc->price ?? '0');
+            }
+            $lineSubtotals[] = bcmul($unitPrice, (string) $row['quantity'], 2);
         }
 
         $discounts = $this->distributeDiscountAcrossLines($lineSubtotals, $posDiscount);
 
-        return DB::transaction(function () use ($branchId, $patientId, $currency, $cart, $method, $medications, $data, $discounts, $posDiscount, $amountTendered) {
+        return DB::transaction(function () use ($branchId, $patientId, $currency, $cart, $method, $medications, $services, $medRows, $data, $discounts, $posDiscount, $amountTendered) {
             $invoice = $this->manualInvoiceService->createStandaloneDraft(
                 branchId: $branchId,
                 patientId: $patientId,
@@ -113,10 +139,18 @@ class PharmacyPosCheckoutService
             }
 
             foreach ($cart as $index => $row) {
-                $medication = $medications[$row['medication_id']];
-                $service = $medication->service;
+                $isMed = ($row['type'] ?? 'medication') === 'medication';
+                if ($isMed) {
+                    $sourceItem = $medications[$row['id']];
+                    $service = $sourceItem->service;
+                    $unitPrice = (string) ($service->price ?? '0');
+                } else {
+                    $sourceItem = $services[$row['id']];
+                    $service = $sourceItem;
+                    $unitPrice = (string) ($sourceItem->price ?? '0');
+                }
+
                 $quantity = (int) $row['quantity'];
-                $unitPrice = (string) ($service->price ?? '0');
                 $lineDiscount = $discounts[$index] ?? '0.00';
                 $gross = bcmul($unitPrice, (string) $quantity, 2);
                 $netBeforeTax = bcsub($gross, $lineDiscount, 2);
@@ -126,10 +160,8 @@ class PharmacyPosCheckoutService
 
                 $lineData = [
                     'invoice_id' => $invoice->id,
-                    'billable_type' => $medication->getMorphClass(),
-                    'billable_id' => $medication->id,
                     'service_id' => $service->id,
-                    'description' => $service->name,
+                    'description' => $service->name ?? $sourceItem->name,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount_amount' => $lineDiscount,
@@ -137,10 +169,21 @@ class PharmacyPosCheckoutService
                     'amount_paid' => '0',
                     'line_status' => InvoiceLineStatus::Unpaid,
                     'patient_responsibility_amount' => $netBeforeTax,
-                    'unit_id' => $medication->billing_unit_id,
-                    'unit_label_snapshot' => $medication->billingUnit?->label,
                     'metadata' => ['source' => 'pharmacy_pos'],
                 ];
+
+                if ($isMed) {
+                    $lineData['billable_type'] = $sourceItem->getMorphClass();
+                    $lineData['billable_id'] = $sourceItem->id;
+                    $lineData['unit_id'] = $sourceItem->billing_unit_id;
+                    $lineData['unit_label_snapshot'] = $sourceItem->billingUnit?->label;
+                } else {
+                    $lineData['billable_type'] = null;
+                    $lineData['billable_id'] = null;
+                    $lineData['unit_id'] = null;
+                    $lineData['unit_label_snapshot'] = null;
+                    $lineData['metadata']['item_type'] = 'service';
+                }
 
                 if ($patientId) {
                     $pricing = $this->insurancePricing->resolveForItem(
@@ -193,10 +236,10 @@ class PharmacyPosCheckoutService
                 metadata: $paymentMetadata,
             );
 
-            foreach ($cart as $row) {
+            foreach ($medRows as $row) {
                 $this->stockProvider->decrement(
                     branchId: $branchId,
-                    itemId: $row['medication_id'],
+                    itemId: $row['id'],
                     quantity: (int) $row['quantity'],
                     reason: 'pos_sale',
                 );
@@ -224,53 +267,80 @@ class PharmacyPosCheckoutService
 
         Branch::query()->findOrFail($branchId);
 
-        $medicationIds = array_column($cart, 'medication_id');
-        $medications = Medication::query()
-            ->with(['service', 'billingUnit'])
-            ->whereIn('id', $medicationIds)
-            ->where('is_active', true)
-            ->get()
-            ->keyBy('id');
+        $medRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'medication');
+        $svcRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'service');
 
-        foreach ($cart as $row) {
-            if (! isset($medications[$row['medication_id']])) {
-                throw new \InvalidArgumentException("Medication {$row['medication_id']} not found or inactive.");
+        $medications = collect();
+        if (! empty($medRows)) {
+            $medIds = array_column($medRows, 'id');
+            $medications = Medication::query()
+                ->with(['service', 'billingUnit'])
+                ->whereIn('id', $medIds)
+                ->where('is_active', true)
+                ->get()
+                ->keyBy('id');
+
+            foreach ($medRows as $row) {
+                if (! isset($medications[$row['id']])) {
+                    throw new \InvalidArgumentException("Medication {$row['id']} not found or inactive.");
+                }
+                $medication = $medications[$row['id']];
+                if (! $medication->billingService()) {
+                    throw new \InvalidArgumentException(
+                        "{$medication->displayName()} is not configured for billing. Set a price in Medications."
+                    );
+                }
             }
-            $medication = $medications[$row['medication_id']];
-            if (! $medication->billingService()) {
-                throw new \InvalidArgumentException(
-                    "{$medication->displayName()} is not configured for billing. Set a price in Medications."
-                );
+
+            foreach ($medRows as $row) {
+                $medication = $medications[$row['id']];
+                if ($medication->controlled_schedule !== null) {
+                    throw new \InvalidArgumentException(
+                        "{$medication->service?->name} is a controlled substance and cannot be sold via POS. Use clinical dispensing."
+                    );
+                }
+            }
+
+            foreach ($medRows as $row) {
+                if (! $this->stockProvider->hasStock($branchId, $row['id'], (int) $row['quantity'])) {
+                    throw new InsufficientStockException('Insufficient stock to complete POS sale.');
+                }
             }
         }
 
-        foreach ($cart as $row) {
-            $medication = $medications[$row['medication_id']];
-            if ($medication->controlled_schedule !== null) {
-                throw new \InvalidArgumentException(
-                    "{$medication->service?->name} is a controlled substance and cannot be sold via POS. Use clinical dispensing."
-                );
-            }
-        }
+        $services = collect();
+        if (! empty($svcRows)) {
+            $svcIds = array_column($svcRows, 'id');
+            $services = Service::query()
+                ->whereIn('id', $svcIds)
+                ->where('is_active', true)
+                ->where('is_billable', true)
+                ->get()
+                ->keyBy('id');
 
-        foreach ($cart as $row) {
-            if (! $this->stockProvider->hasStock($branchId, $row['medication_id'], (int) $row['quantity'])) {
-                throw new InsufficientStockException('Insufficient stock to complete POS sale.');
+            foreach ($svcRows as $row) {
+                if (! isset($services[$row['id']])) {
+                    throw new \InvalidArgumentException("Service {$row['id']} not found or inactive.");
+                }
             }
         }
 
         $lineSubtotals = [];
         foreach ($cart as $row) {
-            $medication = $medications[$row['medication_id']];
-            $service = $medication->service;
-            $quantity = (int) $row['quantity'];
-            $unitPrice = (string) ($service->price ?? '0');
-            $lineSubtotals[] = bcmul($unitPrice, (string) $quantity, 2);
+            $isMed = ($row['type'] ?? 'medication') === 'medication';
+            if ($isMed) {
+                $medication = $medications[$row['id']];
+                $unitPrice = (string) ($medication->service->price ?? '0');
+            } else {
+                $svc = $services[$row['id']];
+                $unitPrice = (string) ($svc->price ?? '0');
+            }
+            $lineSubtotals[] = bcmul($unitPrice, (string) $row['quantity'], 2);
         }
 
         $discounts = $this->distributeDiscountAcrossLines($lineSubtotals, $posDiscount);
 
-        return DB::transaction(function () use ($branchId, $patientId, $currency, $cart, $medications, $data, $discounts, $posDiscount) {
+        return DB::transaction(function () use ($branchId, $patientId, $currency, $cart, $medications, $services, $medRows, $data, $discounts, $posDiscount) {
             $invoice = $this->manualInvoiceService->createStandaloneDraft(
                 branchId: $branchId,
                 patientId: $patientId,
@@ -286,10 +356,18 @@ class PharmacyPosCheckoutService
             }
 
             foreach ($cart as $index => $row) {
-                $medication = $medications[$row['medication_id']];
-                $service = $medication->service;
+                $isMed = ($row['type'] ?? 'medication') === 'medication';
+                if ($isMed) {
+                    $sourceItem = $medications[$row['id']];
+                    $service = $sourceItem->service;
+                    $unitPrice = (string) ($service->price ?? '0');
+                } else {
+                    $sourceItem = $services[$row['id']];
+                    $service = $sourceItem;
+                    $unitPrice = (string) ($sourceItem->price ?? '0');
+                }
+
                 $quantity = (int) $row['quantity'];
-                $unitPrice = (string) ($service->price ?? '0');
                 $lineDiscount = $discounts[$index] ?? '0.00';
                 $gross = bcmul($unitPrice, (string) $quantity, 2);
                 $netBeforeTax = bcsub($gross, $lineDiscount, 2);
@@ -299,21 +377,30 @@ class PharmacyPosCheckoutService
 
                 $lineData = [
                     'invoice_id' => $invoice->id,
-                    'billable_type' => $medication->getMorphClass(),
-                    'billable_id' => $medication->id,
                     'service_id' => $service->id,
-                    'description' => $service->name,
-                    'quantity' => (int) $row['quantity'],
+                    'description' => $service->name ?? $sourceItem->name,
+                    'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount_amount' => $lineDiscount,
                     'tax_amount' => '0',
                     'amount_paid' => '0',
                     'line_status' => InvoiceLineStatus::Unpaid,
                     'patient_responsibility_amount' => $netBeforeTax,
-                    'unit_id' => $medication->billing_unit_id,
-                    'unit_label_snapshot' => $medication->billingUnit?->label,
                     'metadata' => ['source' => 'pharmacy_pos'],
                 ];
+
+                if ($isMed) {
+                    $lineData['billable_type'] = $sourceItem->getMorphClass();
+                    $lineData['billable_id'] = $sourceItem->id;
+                    $lineData['unit_id'] = $sourceItem->billing_unit_id;
+                    $lineData['unit_label_snapshot'] = $sourceItem->billingUnit?->label;
+                } else {
+                    $lineData['billable_type'] = null;
+                    $lineData['billable_id'] = null;
+                    $lineData['unit_id'] = null;
+                    $lineData['unit_label_snapshot'] = null;
+                    $lineData['metadata']['item_type'] = 'service';
+                }
 
                 if ($patientId) {
                     $pricing = $this->insurancePricing->resolveForItem(
@@ -345,6 +432,17 @@ class PharmacyPosCheckoutService
             $invoice->save();
 
             $invoice = $this->issuanceService->issue($invoice->fresh(['lines']));
+
+            if ($medRows) {
+                foreach ($medRows as $row) {
+                    $this->stockProvider->decrement(
+                        branchId: $branchId,
+                        itemId: $row['id'],
+                        quantity: (int) $row['quantity'],
+                        reason: 'pos_sale',
+                    );
+                }
+            }
 
             return [
                 'invoice' => $invoice->fresh(['lines']),
