@@ -12,6 +12,7 @@ use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
+use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 
 class MedicationOrderService
@@ -81,6 +82,8 @@ class MedicationOrderService
                     PrescriptionDetail::create([
                         'request_item_id' => $item->id,
                         'dosage' => $itemData['dosage'] ?? null,
+                        'dose_amount' => $itemData['dose_amount'] ?? null,
+                        'dose_unit_id' => $itemData['dose_unit_id'] ?? null,
                         'frequency' => $itemData['frequency'] ?? null,
                         'route' => $itemData['route'] ?? null,
                         'duration_days' => $itemData['duration_days'] ?? null,
@@ -90,6 +93,11 @@ class MedicationOrderService
                         'refills' => $itemData['refills'] ?? 0,
                         'total_administrations' => $totalAdministrations,
                     ]);
+
+                    $medication = Medication::where('service_id', $item->service_id)->first();
+                    if ($medication?->billing_unit_id) {
+                        $item->updateQuietly(['billing_unit_id' => $medication->billing_unit_id]);
+                    }
                 }
             }
 

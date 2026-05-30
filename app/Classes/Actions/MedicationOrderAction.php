@@ -136,8 +136,22 @@ class MedicationOrderAction
                             ->columns(2)
                             ->schema([
                                 TextInput::make('dosage')
-                                    ->label('Dosage')
-                                    ->placeholder('e.g. 500mg'),
+                                    ->label('Dosage (text)')
+                                    ->placeholder('e.g. 500mg')
+                                    ->helperText('Or use structured fields below'),
+
+                                TextInput::make('dose_amount')
+                                    ->label('Dose Amount')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->placeholder('e.g. 5'),
+
+                                Select::make('dose_unit_id')
+                                    ->label('Dose Unit')
+                                    ->options(\Modules\Core\Models\Unit::pluck('label', 'id'))
+                                    ->searchable()
+                                    ->placeholder('e.g. ml, tablet'),
 
                                 Select::make('frequency')
                                     ->label('Frequency')

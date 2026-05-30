@@ -16,6 +16,7 @@ use Modules\Pharmacy\Exceptions\DuplicateDispenseException;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Dispense;
 use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Classes\Support\MedicationQuantityValidator;
 
 class DispenseService
 {
@@ -63,11 +64,16 @@ class DispenseService
 
             $this->stockProvider->decrement($branchId, $medication->id, $qty, 'dispense');
 
+            $unitId = $medication->stock_unit_id ?? $medication->billing_unit_id;
+
+            MedicationQuantityValidator::validateDispenseQuantity($medication, $qty);
+
             $dispense = Dispense::query()->create([
                 'request_item_id' => $item->id,
                 'medication_id' => $medication->id,
                 'dispensed_by' => $dispensedBy->id,
                 'quantity' => $qty,
+                'unit_id' => $unitId,
                 'batch_number' => $data['batch_number'] ?? null,
                 'expiry_date' => $data['expiry_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
