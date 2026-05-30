@@ -2,6 +2,7 @@
 
 namespace Modules\Pharmacy\Observers;
 
+use Modules\Pharmacy\Classes\Support\UnitResolver;
 use Modules\Pharmacy\Models\Medication;
 
 class MedicationObserver
@@ -10,6 +11,13 @@ class MedicationObserver
     {
         if (blank($medication->generic_name) && blank($medication->brand_name)) {
             $medication->generic_name = 'Unspecified';
+        }
+
+        if (blank($medication->stock_unit_id) && $medication->dosage_form) {
+            $defaults = app(UnitResolver::class)->defaultsForDosageForm($medication->dosage_form);
+            $medication->stock_unit_id ??= $defaults['stock_unit']?->id;
+            $medication->billing_unit_id ??= $defaults['billing_unit']?->id;
+            $medication->dose_unit_id ??= $defaults['dose_unit']?->id;
         }
     }
 

@@ -20,6 +20,7 @@ class Dispense extends Model
         'medication_id',
         'dispensed_by',
         'quantity',
+        'unit_id',
         'batch_number',
         'expiry_date',
         'notes',
@@ -50,5 +51,10 @@ class Dispense extends Model
     public function dispensedBy(): BelongsTo
     {
         return $this->belongsTo(config('auth.providers.users.model'), 'dispensed_by');
+    }
+
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Core\Models\Unit::class);
     }
 }

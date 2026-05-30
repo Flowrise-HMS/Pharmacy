@@ -5,6 +5,7 @@ namespace Modules\Pharmacy\Providers;
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Pharmacy\Classes\Services\StockService;
 use Modules\Pharmacy\Console\BackfillMedicationBillingServicesCommand;
+use Modules\Pharmacy\Console\BackfillMedicationUnitsCommand;
 use Modules\Pharmacy\Console\ImportFDANdcDrugData;
 use Modules\Pharmacy\Models\Dispense;
 use Modules\Pharmacy\Models\Medication;
@@ -50,6 +51,7 @@ class PharmacyServiceProvider extends ModuleServiceProvider
         $this->commands([
             ImportFDANdcDrugData::class,
             BackfillMedicationBillingServicesCommand::class,
+            BackfillMedicationUnitsCommand::class,
         ]);
     }
 }

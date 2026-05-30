@@ -21,6 +21,7 @@ class StockMovement extends BaseModel
         'medication_id',
         'delta',
         'quantity_after',
+        'unit_label_snapshot',
         'reason',
         'reference_type',
         'reference_id',

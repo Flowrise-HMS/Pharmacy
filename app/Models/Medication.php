@@ -32,12 +32,17 @@ class Medication extends Model
         'strength',
         'controlled_schedule',
         'is_active',
+        'stock_unit_id',
+        'billing_unit_id',
+        'dose_unit_id',
+        'units_per_stock_unit',
     ];
 
     protected $casts = [
         'dosage_form' => DosageForm::class,
         'controlled_schedule' => ControlledSchedule::class,
         'is_active' => 'boolean',
+        'units_per_stock_unit' => 'decimal:4',
     ];
 
     protected static function newFactory(): MedicationFactory
@@ -102,5 +107,20 @@ class Medication extends Model
     public function stockMovements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    public function stockUnit(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'stock_unit_id');
+    }
+
+    public function billingUnit(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'billing_unit_id');
+    }
+
+    public function doseUnit(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'dose_unit_id');
     }
 }
