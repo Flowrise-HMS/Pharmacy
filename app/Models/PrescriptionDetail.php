@@ -17,6 +17,8 @@ class PrescriptionDetail extends Model
     protected $fillable = [
         'request_item_id',
         'dosage',
+        'dose_amount',
+        'dose_unit_id',
         'frequency',
         'route',
         'duration_days',
@@ -32,10 +34,16 @@ class PrescriptionDetail extends Model
         'duration_days' => 'integer',
         'refills' => 'integer',
         'total_administrations' => 'integer',
+        'dose_amount' => 'decimal:4',
     ];
 
     public function requestItem(): BelongsTo
     {
         return $this->belongsTo(RequestItem::class);
+    }
+
+    public function doseUnit(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'dose_unit_id');
     }
 }
