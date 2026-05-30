@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\StockProviderContract;
+use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Exceptions\InsufficientStockException;
+use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
 use Modules\Pharmacy\Models\StockMovement;
 
@@ -99,12 +101,25 @@ class StockService implements StockProviderContract
             return;
         }
 
+        $unitLabel = null;
+        if ($medicationId && DB::getSchemaBuilder()->hasTable('units')) {
+            $stockUnitId = Medication::query()
+                ->where('id', $medicationId)
+                ->value('stock_unit_id');
+            if ($stockUnitId) {
+                $unitLabel = Unit::query()
+                    ->where('id', $stockUnitId)
+                    ->value('label');
+            }
+        }
+
         StockMovement::create([
             'id' => (string) Str::uuid(),
             'branch_id' => $branchId,
             'medication_id' => $medicationId,
             'delta' => $delta,
             'quantity_after' => $quantityAfter,
+            'unit_label_snapshot' => $unitLabel,
             'reason' => $reason,
             'reference_type' => null,
             'reference_id' => null,

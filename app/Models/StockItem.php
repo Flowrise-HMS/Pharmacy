@@ -41,4 +41,14 @@ class StockItem extends Model
     {
         return $this->belongsTo(Branch::class);
     }
+
+    public function getQuantityOnHandWithUnitAttribute(): string
+    {
+        return $this->quantity_on_hand . ' ' . ($this->medication?->stockUnit?->label ?? '');
+    }
+
+    public function getReorderPointWithUnitAttribute(): string
+    {
+        return $this->reorder_point . ' ' . ($this->medication?->stockUnit?->label ?? '');
+    }
 }

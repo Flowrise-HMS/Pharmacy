@@ -8,6 +8,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Context;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Models\StockMovement;
 
 class StockMovementForm
 {
@@ -32,11 +33,13 @@ class StockMovementForm
                 TextInput::make('delta')
                     ->label(__('Quantity Change (Delta)'))
                     ->numeric()
-                    ->required(),
+                    ->required()
+                    ->suffix(fn (?StockMovement $record): string => $record?->unit_label_snapshot ?? $record?->medication?->stockUnit?->label ?? ''),
                 TextInput::make('quantity_after')
                     ->label(__('Quantity After'))
                     ->numeric()
-                    ->required(),
+                    ->required()
+                    ->suffix(fn (?StockMovement $record): string => $record?->unit_label_snapshot ?? $record?->medication?->stockUnit?->label ?? ''),
                 TextInput::make('reason')
                     ->maxLength(64),
                 Select::make('performed_by')

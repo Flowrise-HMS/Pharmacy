@@ -18,6 +18,7 @@ class DispenseFactory extends Factory
             'medication_id' => Medication::factory(),
             'dispensed_by' => null,
             'quantity' => fake()->numberBetween(1, 30),
+            'unit_id' => null,
             'batch_number' => fake()->optional()->bothify('BATCH-####'),
             'expiry_date' => fake()->optional()->dateTimeBetween('+1 month', '+2 years'),
             'notes' => fake()->optional()->sentence(),

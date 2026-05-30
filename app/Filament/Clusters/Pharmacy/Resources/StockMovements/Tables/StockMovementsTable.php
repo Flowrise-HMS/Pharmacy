@@ -35,13 +35,13 @@ class StockMovementsTable
                     ->searchable(),
                 TextColumn::make('delta')
                     ->label('Delta')
-                    ->numeric()
                     ->sortable()
-                    ->color(fn (int $state): string => $state >= 0 ? 'success' : 'danger'),
+                    ->color(fn (int $state): string => $state >= 0 ? 'success' : 'danger')
+                    ->formatStateUsing(fn ($record): string => $record->delta . ' ' . ($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
                 TextColumn::make('quantity_after')
                     ->label('After')
-                    ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(fn ($record): string => $record->quantity_after . ' ' . ($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
                 TextColumn::make('reason')
                     ->label('Reason')
                     ->toggleable(isToggledHiddenByDefault: true)

@@ -57,4 +57,14 @@ class StockMovement extends BaseModel
     {
         return $this->belongsTo(User::class, 'performed_by');
     }
+
+    public function getDeltaWithUnitAttribute(): string
+    {
+        return $this->delta . ' ' . ($this->unit_label_snapshot ?? $this->medication?->stockUnit?->label ?? '');
+    }
+
+    public function getQuantityAfterWithUnitAttribute(): string
+    {
+        return $this->quantity_after . ' ' . ($this->unit_label_snapshot ?? $this->medication?->stockUnit?->label ?? '');
+    }
 }

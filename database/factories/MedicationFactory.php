@@ -4,6 +4,7 @@ namespace Modules\Pharmacy\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Core\Models\Service;
+use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Models\Medication;
 
@@ -23,6 +24,10 @@ class MedicationFactory extends Factory
             'strength' => fake()->randomElement(['250mg', '500mg', '5mg/5ml', '10mg']),
             'controlled_schedule' => null,
             'is_active' => true,
+            'stock_unit_id' => Unit::factory(),
+            'billing_unit_id' => Unit::factory(),
+            'dose_unit_id' => Unit::factory(),
+            'units_per_stock_unit' => null,
         ];
     }
 }

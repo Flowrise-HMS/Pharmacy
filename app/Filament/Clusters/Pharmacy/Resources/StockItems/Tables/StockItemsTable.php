@@ -12,6 +12,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Models\StockItem;
 
 class StockItemsTable
 {
@@ -23,8 +24,12 @@ class StockItemsTable
                 TextColumn::make('medication')
                     ->state(fn($record) => $record?->medication?->displayName())->label('Medication')->searchable(false),
                 TextColumn::make('branch.name')->label('Branch')->searchable(),
-                TextColumn::make('quantity_on_hand')->sortable(),
-                TextColumn::make('reorder_point')->sortable(),
+                TextColumn::make('quantity_on_hand')
+                    ->sortable()
+                    ->formatStateUsing(fn ($record): string => $record->quantity_on_hand . ' ' . ($record->medication?->stockUnit?->label ?? '')),
+                TextColumn::make('reorder_point')
+                    ->sortable()
+                    ->formatStateUsing(fn ($record): string => $record->reorder_point . ' ' . ($record->medication?->stockUnit?->label ?? '')),
                 TextColumn::make('updated_at')->dateTime()->sortable(),
             ])
             ->recordActions([

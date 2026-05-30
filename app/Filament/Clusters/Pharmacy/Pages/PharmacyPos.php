@@ -431,7 +431,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
         }
 
         $medication = Medication::query()
-            ->with(['service', 'stockItems' => fn ($q) => $q->where('branch_id', $this->selectedBranchId)])
+            ->with(['service', 'billingUnit', 'stockItems' => fn ($q) => $q->where('branch_id', $this->selectedBranchId)])
             ->findOrFail($medicationId);
 
         $stockQty = $medication->stockItems->sum('quantity_on_hand');
@@ -470,6 +470,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'price' => (float) ($medication->service?->price ?? 0),
                 'quantity' => 1,
                 'available' => $stockQty,
+                'unit_label' => $medication->billingUnit?->label ?? '',
             ];
         }
 
@@ -482,7 +483,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $service = Service::query()
             ->where('is_active', true)
             ->where('is_billable', true)
-            ->with('category')
+            ->with(['category', 'billingUnit'])
             ->findOrFail($serviceId);
 
         $key = 's'.$service->id;
@@ -499,6 +500,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'category' => $service->category?->name,
                 'price' => (float) ($service->price ?? 0),
                 'quantity' => 1,
+                'unit_label' => $service->billingUnit?->label ?? '',
             ];
         }
 

@@ -6,6 +6,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Modules\Pharmacy\Models\StockMovement;
 
 class StockMovementInfolist
 {
@@ -33,10 +34,12 @@ class StockMovementInfolist
                                 TextEntry::make('delta')
                                     ->label('Quantity Change')
                                     ->weight('bold')
-                                    ->color(fn (int $state): string => $state >= 0 ? 'success' : 'danger'),
+                                    ->color(fn (int $state): string => $state >= 0 ? 'success' : 'danger')
+                                    ->formatStateUsing(fn ($record): string => $record->delta . ' ' . ($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
                                 TextEntry::make('quantity_after')
                                     ->label('Quantity After')
-                                    ->weight('bold'),
+                                    ->weight('bold')
+                                    ->formatStateUsing(fn ($record): string => $record->quantity_after . ' ' . ($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
                             ]),
                         TextEntry::make('reason')
                             ->label('Reason')

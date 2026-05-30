@@ -57,4 +57,9 @@ class Dispense extends Model
     {
         return $this->belongsTo(\Modules\Core\Models\Unit::class);
     }
+
+    public function getQuantityWithUnitAttribute(): string
+    {
+        return $this->quantity . ' ' . ($this->unit?->label ?? '');
+    }
 }

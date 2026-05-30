@@ -7,6 +7,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Models\StockItem;
 
 class StockItemForm
 {
@@ -31,12 +32,14 @@ class StockItemForm
                 TextInput::make('quantity_on_hand')
                     ->numeric()
                     ->required()
-                    ->minValue(0),
+                    ->minValue(0)
+                    ->suffix(fn (?StockItem $record): string => $record?->medication?->stockUnit?->label ?? ''),
                 TextInput::make('reorder_point')
                     ->numeric()
                     ->required()
                     ->default(1)
-                    ->minValue(0),
+                    ->minValue(0)
+                    ->suffix(fn (?StockItem $record): string => $record?->medication?->stockUnit?->label ?? ''),
             ]);
     }
 }

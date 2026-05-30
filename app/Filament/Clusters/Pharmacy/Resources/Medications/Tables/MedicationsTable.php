@@ -24,7 +24,7 @@ class MedicationsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->withSum('stockItems', 'quantity_on_hand'))
+                ->modifyQueryUsing(fn ($query) => $query->withSum('stockItems', 'quantity_on_hand')->with(['stockUnit']))
             ->columns([
                 TextColumn::make('#')->rowIndex(),
                 TextColumn::make('display_name')
@@ -36,10 +36,13 @@ class MedicationsTable
                 TextColumn::make('strength'),
                 TextColumn::make('stock_items_sum_quantity_on_hand')
                     ->label('In Stock')
-                    ->numeric()
                     ->sortable()
                     ->default(0)
-                    ->color(fn ($state) => $state > 0 ? 'success' : 'danger'),
+                    ->color(fn ($state) => $state > 0 ? 'success' : 'danger')
+                    ->formatStateUsing(function (Medication $record): string {
+                        $qty = $record->stock_items_sum_quantity_on_hand ?? 0;
+                        return $qty . ' ' . ($record->stockUnit?->label ?? '');
+                    }),
                 TextColumn::make('service.price')
                     ->label('Cash price')
                     ->money(config('core.default_currency'))

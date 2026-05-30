@@ -2,11 +2,12 @@
 
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Schemas;
 
+use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\RepeatableEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Models\StockItem;
 
 class MedicationInfolist
 {
@@ -21,6 +22,13 @@ class MedicationInfolist
                 TextEntry::make('brand_name'),
                 TextEntry::make('dosage_form')->badge(),
                 TextEntry::make('strength'),
+                Section::make('Units')
+                    ->schema([
+                        TextEntry::make('stockUnit.label')->label('Stock Unit'),
+                        TextEntry::make('billingUnit.label')->label('Billing Unit'),
+                        TextEntry::make('doseUnit.label')->label('Dose Unit'),
+                        TextEntry::make('units_per_stock_unit')->label('Units per Stock Unit')->numeric(),
+                    ]),
                 TextEntry::make('rxnorm_code'),
                 TextEntry::make('ndc_code'),
                 TextEntry::make('controlled_schedule')->badge(),
@@ -29,14 +37,20 @@ class MedicationInfolist
                     ->schema([
                         TextEntry::make('total_stock')
                             ->label('Total')
-                            ->state(fn (Medication $record) => $record->stockItems()->sum('quantity_on_hand'))
-                            ->numeric()
+                            ->state(function (Medication $record) {
+                                $qty = $record->stockItems()->sum('quantity_on_hand');
+                                return $qty . ' ' . ($record->stockUnit?->label ?? '');
+                            })
                             ->color(fn ($state) => $state > 0 ? 'success' : 'danger'),
                         RepeatableEntry::make('stockItems')
                             ->schema([
                                 TextEntry::make('branch.name')->label('Branch'),
-                                TextEntry::make('quantity_on_hand')->label('Qty')->numeric(),
-                                TextEntry::make('reorder_point')->label('Reorder At')->numeric(),
+                                TextEntry::make('quantity_on_hand')
+                                    ->label('Qty')
+                                    ->formatStateUsing(fn (StockItem $record): string => $record->quantity_on_hand . ' ' . ($record->medication?->stockUnit?->label ?? '')),
+                                TextEntry::make('reorder_point')
+                                    ->label('Reorder At')
+                                    ->formatStateUsing(fn (StockItem $record): string => $record->reorder_point . ' ' . ($record->medication?->stockUnit?->label ?? '')),
                             ])
                             ->columns(3),
                     ]),

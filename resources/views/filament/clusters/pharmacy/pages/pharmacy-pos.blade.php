@@ -138,6 +138,9 @@
                                 </p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                     {{ config('core.default_currency') }} {{ number_format($item['price'], 2) }}
+                                    @if(!empty($item['unit_label']))
+                                        / {{ $item['unit_label'] }}
+                                    @endif
                                 </p>
                                 <div class="flex items-center gap-2 mt-1.5">
                                     <button type="button" wire:click="updateQuantity('{{ $id }}', {{ $item['quantity'] - 1 }})"
@@ -149,6 +152,9 @@
                                         wire:change="updateQuantity('{{ $id }}', $event.target.value)"
                                         value="{{ $item['quantity'] }}" min="1"
                                         class="w-12 text-center text-sm rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white py-0.5" />
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 min-w-[3rem]">
+                                        {{ $item['unit_label'] ?? '' }}
+                                    </span>
                                     <button type="button" wire:click="updateQuantity('{{ $id }}', {{ $item['quantity'] + 1 }})"
                                         class="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 text-sm font-medium transition">
                                         +
@@ -200,14 +206,14 @@
                                 <input type="radio" wire:model.live="chargeMode" value="pay_now"
                                     class="text-primary-600 focus:ring-primary-500"
                                     @disabled($cart->isEmpty()) />
-                                <span class="text-gray-700 dark:text-gray-300">{{ __('Pay now') }}</span>
+                                <span class="text-gray-700 ms-3 dark:text-gray-300">{{ __('Pay now') }}</span>
                             </label>
                         @endif
                         <label class="flex items-center gap-1.5 text-sm cursor-pointer">
                             <input type="radio" wire:model.live="chargeMode" value="charge_account"
                                 class="text-primary-600 focus:ring-primary-500"
                                 @disabled($cart->isEmpty()) />
-                            <span class="text-gray-700 dark:text-gray-300">{{ __('Post to account') }}</span>
+                            <span class="text-gray-700 ms-3 dark:text-gray-300">{{ __('Post to account') }}</span>
                         </label>
                     </div>
 
