@@ -51,7 +51,7 @@ class PharmacyPosCheckoutService
 
         $medicationIds = array_column($cart, 'medication_id');
         $medications = Medication::query()
-            ->with('service')
+            ->with(['service', 'billingUnit'])
             ->whereIn('id', $medicationIds)
             ->where('is_active', true)
             ->get()
@@ -137,6 +137,8 @@ class PharmacyPosCheckoutService
                     'amount_paid' => '0',
                     'line_status' => InvoiceLineStatus::Unpaid,
                     'patient_responsibility_amount' => $netBeforeTax,
+                    'unit_id' => $medication->billing_unit_id,
+                    'unit_label_snapshot' => $medication->billingUnit?->label,
                     'metadata' => ['source' => 'pharmacy_pos'],
                 ];
 
@@ -224,7 +226,7 @@ class PharmacyPosCheckoutService
 
         $medicationIds = array_column($cart, 'medication_id');
         $medications = Medication::query()
-            ->with('service')
+            ->with(['service', 'billingUnit'])
             ->whereIn('id', $medicationIds)
             ->where('is_active', true)
             ->get()
@@ -308,6 +310,8 @@ class PharmacyPosCheckoutService
                     'amount_paid' => '0',
                     'line_status' => InvoiceLineStatus::Unpaid,
                     'patient_responsibility_amount' => $netBeforeTax,
+                    'unit_id' => $medication->billing_unit_id,
+                    'unit_label_snapshot' => $medication->billingUnit?->label,
                     'metadata' => ['source' => 'pharmacy_pos'],
                 ];
 

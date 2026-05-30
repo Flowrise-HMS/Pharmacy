@@ -218,6 +218,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->where('quantity_on_hand', '>', 0))
             ->with([
                 'service',
+                'stockUnit',
+                'billingUnit',
                 'stockItems' => fn ($q) => $q->where('branch_id', $this->selectedBranchId),
             ]);
     }
@@ -253,13 +255,14 @@ class PharmacyPos extends Page implements HasActions, HasTable
                         $price = $service ? number_format((float) $service->price, 2) : '0.00';
                         $currency = config('core.default_currency');
                         $qty = (int) ($record?->stockItems?->sum('quantity_on_hand') ?? 0);
+                        $unit = $record?->stockUnit?->label ?? '';
 
                         $priceLabel = match (true) {
                             ! $service => __('No billing'),
                             (float) $service->price <= 0 => __('Free'),
                             default => "{$currency} {$price}",
                         };
-                        $stockLabel = $qty > 0 ? "{$qty} ".__('in stock') : __('Out of stock');
+                        $stockLabel = $qty > 0 ? "{$qty} {$unit} ".__('in stock') : __('Out of stock');
 
                         return "{$priceLabel} | {$stockLabel}";
                     })
@@ -293,15 +296,23 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->weight('bold'),
             TextColumn::make('stock_qty')
                 ->label(__('Stock'))
-                ->state(fn (?Medication $record): int => (int) $record?->stockItems?->sum('quantity_on_hand'))
+                ->state(function (?Medication $record): string {
+                    $qty = (int) ($record?->stockItems?->sum('quantity_on_hand') ?? 0);
+                    $unit = $record?->stockUnit?->label ?? '';
+
+                    return $unit ? "{$qty} {$unit}" : (string) $qty;
+                })
                 ->badge()
                 ->alignCenter()
-                ->color(fn ($state): string => match (true) {
-                    (int) $state > 10 => 'success',
-                    (int) $state > 0 => 'warning',
-                    default => 'danger',
-                })
-                ->formatStateUsing(fn ($state): string => (string) (int) $state),
+                ->color(function ($state): string {
+                    $parts = explode(' ', (string) $state);
+                    $qty = (int) ($parts[0] ?? 0);
+                    return match (true) {
+                        $qty > 10 => 'success',
+                        $qty > 0 => 'warning',
+                        default => 'danger',
+                    };
+                }),
         ];
     }
 
