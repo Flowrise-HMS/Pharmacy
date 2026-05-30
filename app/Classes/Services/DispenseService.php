@@ -66,7 +66,7 @@ class DispenseService
 
             $unitId = $medication->stock_unit_id ?? $medication->billing_unit_id;
 
-            MedicationQuantityValidator::validateDispenseQuantity($medication, $qty);
+            app(MedicationQuantityValidator::class)->assertStockQuantity($medication, $qty);
 
             $dispense = Dispense::query()->create([
                 'request_item_id' => $item->id,

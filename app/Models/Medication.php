@@ -57,19 +57,19 @@ class Medication extends Model
 
     public function displayName(): string
     {
-        $name = "";
-        if($this->brand_name){
-            $name .= "Brand: {$this->brand_name}";
+        if ($this->brand_name) {
+            return $this->strength
+                ? "{$this->brand_name} {$this->strength}"
+                : $this->brand_name;
         }
-        if($this->generic_name){
-            $name .= "Generic Name: {$this->generic_name}";
-        }
-        if(empty(trim($name))){
-            $name = "Unspecified";
-        }
-        $strength = $this->strength;
 
-        return $strength ? "{$name} {$strength}" : $name;
+        if ($this->generic_name) {
+            return $this->strength
+                ? "{$this->generic_name} {$this->strength}"
+                : $this->generic_name;
+        }
+
+        return 'Unspecified';
     }
 
     public function billingService(): ?Service
