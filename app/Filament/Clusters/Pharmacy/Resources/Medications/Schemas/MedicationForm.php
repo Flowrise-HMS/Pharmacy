@@ -7,6 +7,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\CoverageType;
@@ -135,6 +136,36 @@ class MedicationForm
                             ->hidden()
                             ->options(CoverageType::class)
                             ->default(CoverageType::NONE),
+                    ]),
+                Section::make('Units & Packaging')
+                    ->columns(3)
+                    ->schema([
+                        Select::make('stock_unit_id')
+                            ->label('Stock Unit')
+                            ->relationship('stockUnit', 'label')
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->helperText('Unit used for inventory tracking'),
+                        Select::make('billing_unit_id')
+                            ->label('Billing Unit')
+                            ->relationship('billingUnit', 'label')
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->helperText('Unit used for pricing and invoicing'),
+                        Select::make('dose_unit_id')
+                            ->label('Dose Unit')
+                            ->relationship('doseUnit', 'label')
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Unit used for prescriptions and MAR (optional)'),
+                        TextInput::make('units_per_stock_unit')
+                            ->label('Units per Stock Unit')
+                            ->numeric()
+                            ->minValue(0)
+                            ->step(0.0001)
+                            ->helperText('e.g. 100 ml per bottle, 10 tablets per strip'),
                     ]),
                 Section::make('Initial Stock')
                     ->visibleOn('create')
