@@ -45,6 +45,5 @@ class EditMedication extends EditRecord
     protected function afterSave(): void
     {
         app(MedicationBillingSyncService::class)->ensureBillingService($this->record, $this->billingFormData);
-        app(MedicationBillingSyncService::class)->syncBilling($this->record, $this->billingFormData);
     }
 }
