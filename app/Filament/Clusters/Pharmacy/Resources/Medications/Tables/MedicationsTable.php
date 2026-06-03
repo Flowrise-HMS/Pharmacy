@@ -28,7 +28,7 @@ class MedicationsTable
             ->modifyQueryUsing(fn ($query) => $query
                 ->withSum('stockItems', 'quantity_on_hand')
                 ->with(['stockUnit'])?->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value)
-            )
+                ))
             ->columns([
                 TextColumn::make('#')->rowIndex(),
                 TextColumn::make('display_name')
