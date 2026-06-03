@@ -75,7 +75,13 @@ class MedicationForm
                     ->relationship(
                         'service',
                         'name',
-                        fn ($query) => $query->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value))
+                        fn ($query, $record) => $query
+                        ->where(function ($q) use ($record) {
+                            $q->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value));
+                            if ($record?->service_id) {
+                                $q->orWhere('id', $record->service_id);
+                            }
+                        })
                     )
                     ->searchable()
                     ->preload()

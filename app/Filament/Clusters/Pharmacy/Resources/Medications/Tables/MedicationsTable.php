@@ -14,17 +14,21 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Modules\Core\Classes\Services\BranchService;
+use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
-use Modules\Core\Classes\Services\BranchService;
 
 class MedicationsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-                ->modifyQueryUsing(fn ($query) => $query->withSum('stockItems', 'quantity_on_hand')->with(['stockUnit']))
+            ->modifyQueryUsing(fn ($query) => $query
+                ->withSum('stockItems', 'quantity_on_hand')
+                ->with(['stockUnit'])?->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value)
+            )
             ->columns([
                 TextColumn::make('#')->rowIndex(),
                 TextColumn::make('display_name')
