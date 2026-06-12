@@ -10,7 +10,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Fieldset;
-use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Modules\Billing\Models\InvoiceLine;
@@ -18,6 +17,7 @@ use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
+use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
 use Modules\Pharmacy\Classes\Services\MedicationService;
 use Modules\Pharmacy\Enums\DosageForm;
@@ -117,15 +117,6 @@ class MedicationOrderAction
                             ])
                             ->createOptionUsing(function (array $data): string {
                                 return app(MedicationService::class)->createWithService($data)->service_id;
-                            })
-                            ->afterStateUpdated(function ($state, Set $set) {
-                                if (str_starts_with($state, 'drug:')) {
-                                    Notification::make()
-                                        ->title('Drug reference selected')
-                                        ->body('Create a medication from the Pharmacy module to use this drug.')
-                                        ->info()
-                                        ->send();
-                                }
                             }),
                         TextInput::make('quantity')
                             ->numeric()
@@ -197,6 +188,24 @@ class MedicationOrderAction
                 $user = Auth::user();
 
                 try {
+                    foreach ($data['items'] as &$item) {
+                        if (str_starts_with($item['service_id'], 'drug:')) {
+                            $drugId = str($item['service_id'])->after('drug:')->toString();
+                            $drug = Drug::findOrFail($drugId);
+                            $medication = app(MedicationService::class)->createFromDrug($drug, $item);
+                            $item['service_id'] = $medication->service_id;
+                        } elseif (str_starts_with($item['service_id'], 'medication:')) {
+                            $medId = str($item['service_id'])->after('medication:')->toString();
+                            $medication = Medication::findOrFail($medId);
+                            if (! $medication->service_id) {
+                                app(MedicationBillingSyncService::class)->ensureBillingService($medication, []);
+                                $medication->refresh();
+                            }
+                            $item['service_id'] = $medication->service_id;
+                        }
+                    }
+                    unset($item);
+
                     $request = $patient ? $service->order($patient, $data['items'], $user, $encounterId)
                     : $service->order([
                         'guest_name' => $data['guest_name'] ?? 'Guest',

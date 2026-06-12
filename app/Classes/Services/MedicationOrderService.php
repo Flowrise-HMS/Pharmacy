@@ -12,6 +12,7 @@ use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
+use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 
@@ -27,6 +28,24 @@ class MedicationOrderService
      */
     public function order(Patient|array $patientOrGuest, array $items, User $orderedBy, ?string $encounterId = null): ?ServiceRequest
     {
+        foreach ($items as &$item) {
+            if (str_starts_with($item['service_id'], 'drug:')) {
+                $drugId = str($item['service_id'])->after('drug:')->toString();
+                $drug = Drug::findOrFail($drugId);
+                $medication = app(MedicationService::class)->createFromDrug($drug, $item);
+                $item['service_id'] = $medication->service_id;
+            } elseif (str_starts_with($item['service_id'], 'medication:')) {
+                $medId = str($item['service_id'])->after('medication:')->toString();
+                $medication = Medication::findOrFail($medId);
+                if (! $medication->service_id) {
+                    app(MedicationBillingSyncService::class)->ensureBillingService($medication, []);
+                    $medication->refresh();
+                }
+                $item['service_id'] = $medication->service_id;
+            }
+        }
+        unset($item);
+
         foreach ($items as $item) {
             $service = Service::findOrFail($item['service_id']);
 
