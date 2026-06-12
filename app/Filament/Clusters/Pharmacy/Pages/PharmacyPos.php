@@ -223,7 +223,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ? __('Choose an active branch to browse medications.')
                 : __('No active medications with quantity for this branch.'))
             ->recordAction('add_to_cart')
-            ->actions([
+            ->recordActions([
                 Action::make('add_to_cart')
                     ->action(fn (Medication $record) => $this->addToCart($record->id)),
             ]);
