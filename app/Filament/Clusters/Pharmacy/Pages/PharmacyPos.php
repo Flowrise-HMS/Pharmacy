@@ -87,6 +87,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public bool $autoPrintReceipt = false;
 
+    public ?string $lastInvoiceNumber = null;
+
     public string $chargeMode = 'charge_account';
 
     public string $activeTab = 'medications';
@@ -651,10 +653,13 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'amount_tendered' => $amountTendered,
             ]);
 
+            $this->lastInvoiceNumber = $result['invoice']->invoice_number;
+
             Notification::make()
                 ->title(__('Checkout successful'))
                 ->body(__('Invoice:').' '.$result['invoice']->invoice_number)
                 ->success()
+                ->duration(10000)
                 ->send();
 
             if ($this->autoPrintReceipt) {
@@ -700,10 +705,13 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
             $billingDeskUrl = \Modules\Billing\Filament\Clusters\Billing\Pages\BillingDesk::getUrl(['invoice' => $invoice->id]);
 
+            $this->lastInvoiceNumber = $invoice->invoice_number;
+
             Notification::make()
                 ->title(__('Charge created'))
                 ->body(__('Invoice :number sent to billing desk.', ['number' => $invoice->invoice_number]))
                 ->success()
+                ->duration(10000)
                 ->actions([
                     Action::make('open_billing')
                         ->label(__('Open in Billing Desk'))
@@ -749,6 +757,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
     public function clearCart(): void
     {
         $this->resetState();
+        $this->lastInvoiceNumber = null;
     }
 
     protected function saveCartToCache(): void
