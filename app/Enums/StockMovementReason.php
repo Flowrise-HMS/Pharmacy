@@ -38,4 +38,9 @@ enum StockMovementReason: string implements HasColor, HasDescription, HasLabel
             self::TRANSFER => 'info',
         };
     }
+
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 }

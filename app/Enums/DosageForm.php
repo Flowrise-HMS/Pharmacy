@@ -80,4 +80,9 @@ enum DosageForm: string implements HasColor, HasDescription, HasLabel
             default => 'gray',
         };
     }
+
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 }

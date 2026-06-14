@@ -2,10 +2,11 @@
 
 namespace Modules\Pharmacy\Enums;
 
+use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum MedicationFrequency: string implements HasLabel
+enum MedicationFrequency: string implements HasColor, HasLabel
 {
     case QD = 'qd';
     case BID = 'bid';
@@ -34,6 +35,23 @@ enum MedicationFrequency: string implements HasLabel
             self::STAT => 'Immediately (STAT)',
             self::ONCE => 'One Time (Once)',
         };
+    }
+
+    public function getColor(): string|array|null
+    {
+        return match ($this) {
+            self::QD => 'primary',
+            self::BID, self::TID, self::QID => 'info',
+            self::Q4H, self::Q6H, self::Q8H, self::Q12H => 'warning',
+            self::PRN => 'secondary',
+            self::STAT => 'danger',
+            self::ONCE => 'gray',
+        };
+    }
+
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
     }
 
     public function timesPerDay(): ?int

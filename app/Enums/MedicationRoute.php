@@ -2,10 +2,11 @@
 
 namespace Modules\Pharmacy\Enums;
 
+use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum MedicationRoute: string implements HasLabel
+enum MedicationRoute: string implements HasColor, HasLabel
 {
     case PO = 'po';
     case IV = 'iv';
@@ -16,6 +17,26 @@ enum MedicationRoute: string implements HasLabel
     case TOPICAL = 'topical';
     case INHALATION = 'inhalation';
     case OTHERS = 'others';
+
+    public function getColor(): string|array|null
+    {
+        return match ($this) {
+            self::PO => 'primary',
+            self::IV => 'danger',
+            self::IM => 'warning',
+            self::SC => 'info',
+            self::SL => 'success',
+            self::PR => 'secondary',
+            self::TOPICAL => 'warning',
+            self::INHALATION => 'info',
+            self::OTHERS => 'gray',
+        };
+    }
+
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 
     public function getLabel(): string|Htmlable|null
     {
