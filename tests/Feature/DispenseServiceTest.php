@@ -89,6 +89,34 @@ class DispenseServiceTest extends TestCase
         ], $pharmacyUser);
     }
 
+    public function test_in_facility_supply_dispense_does_not_complete_order(): void
+    {
+        [$branch, , $requestItem, $medication] = $this->seedDispenseFixture(false);
+        $requestItem->prescriptionDetail->update([
+            'administration_context' => \Modules\Pharmacy\Enums\AdministrationContext::IN_FACILITY,
+        ]);
+
+        StockItem::factory()->create([
+            'branch_id' => $branch->id,
+            'medication_id' => $medication->id,
+            'quantity_on_hand' => 12,
+        ]);
+
+        $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
+        Role::findOrCreate('pharmacist', 'web');
+        $pharmacyUser->assignRole('pharmacist');
+
+        app(DispenseService::class)->dispense($requestItem, [
+            'medication_id' => $medication->id,
+            'quantity' => 1,
+        ], $pharmacyUser);
+
+        $this->assertDatabaseHas('request_items', [
+            'id' => $requestItem->id,
+            'status' => 'in_progress',
+        ]);
+    }
+
     public function test_it_blocks_duplicate_dispense_for_same_request_item(): void
     {
         [$branch, , $requestItem, $medication] = $this->seedDispenseFixture(false);
@@ -150,6 +178,17 @@ class DispenseServiceTest extends TestCase
 
         $medication = Medication::factory()->create([
             'service_id' => $service->id,
+        ]);
+
+        \Modules\Pharmacy\Models\PrescriptionDetail::create([
+            'request_item_id' => $item->id,
+            'frequency' => 'bid',
+            'duration_days' => 7,
+            'route' => 'po',
+            'administration_context' => \Modules\Pharmacy\Enums\AdministrationContext::TAKE_HOME,
+            'course_started_at' => now(),
+            'course_end_at' => now()->addDays(7),
+            'total_administrations' => 14,
         ]);
 
         return [$branch, $service, $item, $medication];

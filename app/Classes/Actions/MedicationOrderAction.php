@@ -4,6 +4,7 @@ namespace Modules\Pharmacy\Classes\Actions;
 
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -13,6 +14,7 @@ use Filament\Schemas\Components\Fieldset;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Modules\Billing\Models\InvoiceLine;
+use Modules\Clinical\Models\Encounter;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
@@ -20,6 +22,8 @@ use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
 use Modules\Pharmacy\Classes\Services\MedicationService;
+use Modules\Pharmacy\Classes\Services\PrescriptionScheduleCalculator;
+use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Enums\MedicationRoute;
@@ -119,9 +123,11 @@ class MedicationOrderAction
                                 return app(MedicationService::class)->createWithService($data)->service_id;
                             }),
                         TextInput::make('quantity')
+                            ->label('Quantity to bill/dispense')
                             ->numeric()
                             ->default(1)
-                            ->required(),
+                            ->required()
+                            ->helperText('Billable packs — separate from dose schedule below'),
 
                         Fieldset::make('Administration Details')
                             ->columns(2)
@@ -136,28 +142,72 @@ class MedicationOrderAction
                                     ->numeric()
                                     ->minValue(0)
                                     ->step(0.01)
+                                    ->required()
                                     ->placeholder('e.g. 5'),
 
                                 Select::make('dose_unit_id')
                                     ->label('Dose Unit')
                                     ->options(\Modules\Core\Models\Unit::pluck('label', 'id'))
                                     ->searchable()
+                                    ->required()
                                     ->placeholder('e.g. ml, tablet'),
 
                                 Select::make('frequency')
                                     ->label('Frequency')
                                     ->options(MedicationFrequency::class)
-                                    ->searchable(),
+                                    ->searchable()
+                                    ->required()
+                                    ->live(),
 
                                 Select::make('route')
                                     ->label('Route')
                                     ->options(MedicationRoute::class)
-                                    ->searchable(),
+                                    ->searchable()
+                                    ->required()
+                                    ->live(),
 
                                 TextInput::make('duration_days')
                                     ->label('Duration (days)')
                                     ->numeric()
-                                    ->minValue(1),
+                                    ->minValue(1)
+                                    ->required()
+                                    ->live(),
+
+                                Select::make('administration_context')
+                                    ->label('Administration setting')
+                                    ->options(AdministrationContext::class)
+                                    ->default(function () use ($encounterId) {
+                                        if (! $encounterId) {
+                                            return AdministrationContext::TAKE_HOME->value;
+                                        }
+                                        $encounter = Encounter::find($encounterId);
+
+                                        return app(\Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy::class)
+                                            ->defaultAdministrationContext($encounter)
+                                            ->value;
+                                    })
+                                    ->required()
+                                    ->helperText('In facility = staff MAR; Take home = pharmacy dispense'),
+
+                                Checkbox::make('administer_in_facility')
+                                    ->label('Administer in facility (override)')
+                                    ->helperText('Check for OPD injections or ward administration'),
+
+                                Placeholder::make('schedule_preview')
+                                    ->label('Dose schedule (computed)')
+                                    ->content(function ($get) use ($encounterId) {
+                                        $encounter = $encounterId ? Encounter::find($encounterId) : null;
+                                        $schedule = app(PrescriptionScheduleCalculator::class)->compute([
+                                            'frequency' => $get('frequency') ?? 'qd',
+                                            'duration_days' => $get('duration_days') ?? 1,
+                                            'prn' => $get('prn') ?? false,
+                                            'course_started_at' => $encounter?->admitted_at ?? now(),
+                                        ]);
+
+                                        return ($schedule['schedule_summary'] ?? '')
+                                            .' · ends '.$schedule['course_end_at']->format('D M H:i');
+                                    })
+                                    ->columnSpanFull(),
 
                                 Textarea::make('instructions')
                                     ->label('SIG / Instructions')
@@ -165,7 +215,8 @@ class MedicationOrderAction
                                     ->columnSpanFull(),
 
                                 Checkbox::make('prn')
-                                    ->label('Take as needed (PRN)'),
+                                    ->label('Take as needed (PRN)')
+                                    ->live(),
 
                                 TextInput::make('indication')
                                     ->label('Indication'),

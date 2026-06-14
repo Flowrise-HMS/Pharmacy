@@ -70,4 +70,20 @@ enum MedicationFrequency: string implements HasColor, HasLabel
             self::ONCE => 1,
         };
     }
+
+    public function hoursInterval(): ?int
+    {
+        return match ($this) {
+            self::Q4H => 4,
+            self::Q6H => 6,
+            self::Q8H => 8,
+            self::Q12H => 12,
+            default => null,
+        };
+    }
+
+    public function isIntervalBased(): bool
+    {
+        return $this->hoursInterval() !== null;
+    }
 }

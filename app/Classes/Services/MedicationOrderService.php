@@ -5,7 +5,10 @@ namespace Modules\Pharmacy\Classes\Services;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
+use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
+use Modules\Clinical\Classes\Services\MedicationDoseScheduleService;
 use Modules\Clinical\Classes\Services\ServiceRequestService;
+use Modules\Clinical\Models\Encounter;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\ServiceRequest;
 use Modules\Core\Models\Service;
@@ -19,7 +22,10 @@ use Modules\Pharmacy\Models\PrescriptionDetail;
 class MedicationOrderService
 {
     public function __construct(
-        protected ServiceRequestService $serviceRequestService
+        protected ServiceRequestService $serviceRequestService,
+        protected PrescriptionScheduleCalculator $scheduleCalculator,
+        protected MedicationFulfillmentPolicy $fulfillmentPolicy,
+        protected MedicationDoseScheduleService $doseScheduleService,
     ) {}
 
     /**
@@ -79,49 +85,84 @@ class MedicationOrderService
                     orderedBy: $orderedBy->id
                 );
 
+            $encounter = $encounterId ? Encounter::find($encounterId) : null;
+
             foreach ($request->items as $index => $item) {
                 $itemData = $items[$index] ?? [];
-
-                $prescriptionFields = [
-                    'dosage', 'frequency', 'route', 'duration_days',
-                    'instructions', 'prn', 'indication', 'refills',
-                ];
-
-                if (! empty(array_intersect_key(array_flip($prescriptionFields), $itemData))) {
-                    $totalAdministrations = null;
-                    if (! empty($itemData['frequency']) && ! empty($itemData['duration_days'])) {
-                        $freq = MedicationFrequency::tryFrom($itemData['frequency']);
-                        $timesPerDay = $freq?->timesPerDay();
-                        $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN);
-                        if ($timesPerDay && ! $isPrn) {
-                            $totalAdministrations = $timesPerDay * (int) $itemData['duration_days'];
-                        }
-                    }
-
-                    PrescriptionDetail::create([
-                        'request_item_id' => $item->id,
-                        'dosage' => $itemData['dosage'] ?? null,
-                        'dose_amount' => $itemData['dose_amount'] ?? null,
-                        'dose_unit_id' => $itemData['dose_unit_id'] ?? null,
-                        'frequency' => $itemData['frequency'] ?? null,
-                        'route' => $itemData['route'] ?? null,
-                        'duration_days' => $itemData['duration_days'] ?? null,
-                        'instructions' => $itemData['instructions'] ?? null,
-                        'prn' => filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                        'indication' => $itemData['indication'] ?? null,
-                        'refills' => $itemData['refills'] ?? 0,
-                        'total_administrations' => $totalAdministrations,
-                    ]);
-
-                    $medication = Medication::where('service_id', $item->service_id)->first();
-                    if ($medication?->billing_unit_id) {
-                        $item->updateQuietly(['billing_unit_id' => $medication->billing_unit_id]);
-                    }
-                }
+                $this->createPrescriptionDetail($item, $itemData, $encounter);
             }
 
             return $request;
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $itemData
+     */
+    public function createPrescriptionDetail(RequestItem $item, array $itemData, ?Encounter $encounter): PrescriptionDetail
+    {
+        $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $administerInFacility = filter_var($itemData['administer_in_facility'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $context = isset($itemData['administration_context'])
+            ? \Modules\Pharmacy\Enums\AdministrationContext::tryFrom($itemData['administration_context'])
+            : null;
+
+        $context ??= $this->fulfillmentPolicy->defaultAdministrationContext(
+            $encounter,
+            $itemData['route'] ?? null,
+            $administerInFacility,
+        );
+
+        $courseStartedAt = $encounter?->admitted_at ?? now();
+        $schedule = $this->scheduleCalculator->compute([
+            'frequency' => $itemData['frequency'] ?? 'qd',
+            'duration_days' => $itemData['duration_days'] ?? 1,
+            'prn' => $isPrn,
+            'course_started_at' => $courseStartedAt,
+            'max_administrations' => $itemData['max_administrations'] ?? null,
+        ]);
+
+        $detail = PrescriptionDetail::create([
+            'request_item_id' => $item->id,
+            'dosage' => $itemData['dosage'] ?? null,
+            'dose_amount' => $itemData['dose_amount'] ?? null,
+            'dose_unit_id' => $itemData['dose_unit_id'] ?? null,
+            'frequency' => $itemData['frequency'] ?? null,
+            'route' => $itemData['route'] ?? null,
+            'duration_days' => $itemData['duration_days'] ?? null,
+            'instructions' => $itemData['instructions'] ?? null,
+            'prn' => $isPrn,
+            'indication' => $itemData['indication'] ?? null,
+            'refills' => $itemData['refills'] ?? 0,
+            'total_administrations' => $schedule['total_administrations'],
+            'administration_context' => $context,
+            'course_started_at' => $schedule['course_started_at'],
+            'course_end_at' => $schedule['course_end_at'],
+            'max_administrations' => $itemData['max_administrations'] ?? null,
+            'administer_in_facility_flag' => $administerInFacility,
+        ]);
+
+        $this->doseScheduleService->syncNextDoseAt($item);
+
+        $medication = Medication::where('service_id', $item->service_id)->first();
+        if ($medication?->billing_unit_id) {
+            $item->updateQuietly(['billing_unit_id' => $medication->billing_unit_id]);
+        }
+
+        return $detail;
+    }
+
+    public function previewSchedule(array $itemData, ?Encounter $encounter = null): array
+    {
+        $courseStartedAt = $encounter?->admitted_at ?? now();
+
+        return $this->scheduleCalculator->compute([
+            'frequency' => $itemData['frequency'] ?? 'qd',
+            'duration_days' => $itemData['duration_days'] ?? 1,
+            'prn' => filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'course_started_at' => $courseStartedAt,
+            'max_administrations' => $itemData['max_administrations'] ?? null,
+        ]);
     }
 
     protected function canOrderPrescription(User $user, Service $service): bool

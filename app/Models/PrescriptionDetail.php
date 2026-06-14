@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\RequestItem;
+use Modules\Pharmacy\Enums\AdministrationContext;
 
 class PrescriptionDetail extends Model
 {
@@ -27,6 +28,12 @@ class PrescriptionDetail extends Model
         'indication',
         'refills',
         'total_administrations',
+        'administration_context',
+        'course_started_at',
+        'course_end_at',
+        'next_dose_at',
+        'max_administrations',
+        'administer_in_facility_flag',
     ];
 
     protected $casts = [
@@ -34,7 +41,13 @@ class PrescriptionDetail extends Model
         'duration_days' => 'integer',
         'refills' => 'integer',
         'total_administrations' => 'integer',
+        'max_administrations' => 'integer',
         'dose_amount' => 'decimal:4',
+        'administration_context' => AdministrationContext::class,
+        'course_started_at' => 'datetime',
+        'course_end_at' => 'datetime',
+        'next_dose_at' => 'datetime',
+        'administer_in_facility_flag' => 'boolean',
     ];
 
     public function requestItem(): BelongsTo
@@ -45,5 +58,15 @@ class PrescriptionDetail extends Model
     public function doseUnit(): BelongsTo
     {
         return $this->belongsTo(\Modules\Core\Models\Unit::class, 'dose_unit_id');
+    }
+
+    public function isInFacility(): bool
+    {
+        return $this->administration_context === AdministrationContext::IN_FACILITY;
+    }
+
+    public function isTakeHome(): bool
+    {
+        return $this->administration_context === AdministrationContext::TAKE_HOME;
     }
 }

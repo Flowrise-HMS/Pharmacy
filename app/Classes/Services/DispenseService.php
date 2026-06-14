@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Billing\Enums\InvoiceLineStatus;
 use Modules\Billing\Models\InvoiceLine;
+use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Enums\TaskOutcome;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\Task;
@@ -21,7 +22,8 @@ use Modules\Pharmacy\Classes\Support\MedicationQuantityValidator;
 class DispenseService
 {
     public function __construct(
-        protected StockProviderContract $stockProvider
+        protected StockProviderContract $stockProvider,
+        protected MedicationFulfillmentPolicy $policy,
     ) {}
 
     /**
@@ -38,11 +40,14 @@ class DispenseService
             throw new UnauthorizedMedicationOrderException('Only pharmacy staff can dispense.');
         }
 
-        if ($service->requires_payment_before && ! $this->isPaidFor($item)) {
+        if ($this->policy->requiresPaymentBeforeMarOrDispense($item) && ! $this->policy->isPaidFor($item)) {
             throw new UnauthorizedMedicationOrderException('Payment is required before dispensing this item.');
         }
 
-        if (Dispense::query()->where('request_item_id', $item->id)->exists()) {
+        $detail = $item->prescriptionDetail;
+        $isSupplyOnly = $detail !== null && $this->policy->requiresMar($detail);
+
+        if (! $isSupplyOnly && Dispense::query()->where('request_item_id', $item->id)->exists()) {
             throw new DuplicateDispenseException('This order line has already been dispensed.');
         }
 
@@ -57,8 +62,8 @@ class DispenseService
         $branchId = (string) $item->serviceRequest->branch_id;
         $qty = (int) $data['quantity'];
 
-        return DB::transaction(function () use ($item, $data, $dispensedBy, $medication, $branchId, $qty) {
-            if (Dispense::query()->where('request_item_id', $item->id)->lockForUpdate()->exists()) {
+        return DB::transaction(function () use ($item, $data, $dispensedBy, $medication, $branchId, $qty, $isSupplyOnly) {
+            if (! $isSupplyOnly && Dispense::query()->where('request_item_id', $item->id)->lockForUpdate()->exists()) {
                 throw new DuplicateDispenseException('This order line has already been dispensed.');
             }
 
@@ -80,6 +85,14 @@ class DispenseService
                 'dispensed_at' => now(),
             ]);
 
+            if ($isSupplyOnly) {
+                if ($item->isPending()) {
+                    $item->markAsInProgress();
+                }
+
+                return $dispense;
+            }
+
             $task = Task::query()->firstOrCreate(
                 ['request_item_id' => $item->id],
                 [
@@ -100,14 +113,6 @@ class DispenseService
 
     protected function isPaidFor(RequestItem $item): bool
     {
-        if (! class_exists(InvoiceLine::class) || ! Schema::hasTable('invoice_lines')) {
-            return false;
-        }
-
-        return InvoiceLine::query()
-            ->where('billable_type', $item::class)
-            ->where('billable_id', $item->id)
-            ->where('line_status', InvoiceLineStatus::Paid)
-            ->exists();
+        return $this->policy->isPaidFor($item);
     }
 }
