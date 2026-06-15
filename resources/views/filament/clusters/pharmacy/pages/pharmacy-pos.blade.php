@@ -99,6 +99,13 @@
                 @endif
             </div>
 
+            @if($selectedPatientId && $selectedBranchId)
+                @livewire(\Modules\Pharmacy\Livewire\PatientPrescriptionsTable::class, [
+                    'patientId' => $selectedPatientId,
+                    'branchId' => $selectedBranchId,
+                ], key('patient-prescriptions-'.$selectedPatientId.'-'.$selectedBranchId))
+            @endif
+
             <x-filament::tabs>
                 <x-filament::tabs.item icon="heroicon-m-squares-2x2"
                     :active="$viewMode === 'card'"
@@ -286,6 +293,7 @@
             </div>
         </div>
     </div>
+    <x-filament-actions::modals />
 <script>
     window.addEventListener('pos-open-receipt', function (event) {
         var url = event.detail && event.detail.url;

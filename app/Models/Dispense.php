@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Pharmacy\Database\Factories\DispenseFactory;
+use Modules\Pharmacy\Enums\DispenseFulfillmentType;
 
 class Dispense extends Model
 {
@@ -25,12 +26,14 @@ class Dispense extends Model
         'expiry_date',
         'notes',
         'dispensed_at',
+        'fulfillment_type',
     ];
 
     protected $casts = [
         'quantity' => 'integer',
         'expiry_date' => 'date',
         'dispensed_at' => 'datetime',
+        'fulfillment_type' => DispenseFulfillmentType::class,
     ];
 
     protected static function newFactory(): DispenseFactory

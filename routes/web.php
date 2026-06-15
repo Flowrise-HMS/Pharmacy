@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\Pharmacy\Http\Controllers\PrescriptionSlipController;
 
 Route::middleware(['web', 'auth'])->group(function () {
-    // Pharmacy module web routes are handled by Filament resources/pages.
+    Route::get('pharmacy/prescription-slip/{requestItem}', [PrescriptionSlipController::class, 'show'])
+        ->name('pharmacy.prescription-slip');
 });

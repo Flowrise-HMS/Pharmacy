@@ -185,7 +185,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function selectPatient($id): void
     {
-        $this->selectedPatientId = $id;
+        $this->selectedPatientId = $id ?: null;
         $this->patientSearch = '';
         $this->patientResults = collect();
         $this->saveCartToCache();
@@ -853,5 +853,19 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->color('gray')
                 ->action('clearCart'),
         ];
+    }
+
+    protected function getActions(): array
+    {
+        return [];
+    }
+
+    public function buildPrescriptionSlipUrl(string $requestItemId): ?string
+    {
+        try {
+            return route('pharmacy.prescription-slip', ['requestItem' => $requestItemId]);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

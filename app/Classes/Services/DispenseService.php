@@ -5,19 +5,17 @@ namespace Modules\Pharmacy\Classes\Services;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Modules\Billing\Enums\InvoiceLineStatus;
-use Modules\Billing\Models\InvoiceLine;
 use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Enums\TaskOutcome;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\Task;
 use Modules\Core\Contracts\StockProviderContract;
+use Modules\Pharmacy\Classes\Support\MedicationQuantityValidator;
+use Modules\Pharmacy\Enums\DispenseFulfillmentType;
 use Modules\Pharmacy\Exceptions\DuplicateDispenseException;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Dispense;
 use Modules\Pharmacy\Models\Medication;
-use Modules\Pharmacy\Classes\Support\MedicationQuantityValidator;
 
 class DispenseService
 {
@@ -36,18 +34,13 @@ class DispenseService
             throw new UnauthorizedMedicationOrderException('Service is required to dispense an item.');
         }
 
-        if (! $dispensedBy->hasAnyRole(['pharmacist', 'pharmacy_technician'])) {
-            throw new UnauthorizedMedicationOrderException('Only pharmacy staff can dispense.');
-        }
-
-        if ($this->policy->requiresPaymentBeforeMarOrDispense($item) && ! $this->policy->isPaidFor($item)) {
-            throw new UnauthorizedMedicationOrderException('Payment is required before dispensing this item.');
-        }
+        $this->assertPharmacyStaff($dispensedBy);
+        $this->assertPaymentGate($item);
 
         $detail = $item->prescriptionDetail;
         $isSupplyOnly = $detail !== null && $this->policy->requiresMar($detail);
 
-        if (! $isSupplyOnly && Dispense::query()->where('request_item_id', $item->id)->exists()) {
+        if (! $isSupplyOnly && $this->hasCompletedFulfillmentDispense($item)) {
             throw new DuplicateDispenseException('This order line has already been dispensed.');
         }
 
@@ -67,11 +60,18 @@ class DispenseService
                 throw new DuplicateDispenseException('This order line has already been dispensed.');
             }
 
+            app(MedicationQuantityValidator::class)->assertStockQuantity($medication, $qty);
+
+            if (! $this->stockProvider->hasStock($branchId, $medication->id, $qty)) {
+                throw new UnauthorizedMedicationOrderException('Insufficient stock to dispense this item.');
+            }
+
             $this->stockProvider->decrement($branchId, $medication->id, $qty, 'dispense');
 
             $unitId = $medication->stock_unit_id ?? $medication->billing_unit_id;
-
-            app(MedicationQuantityValidator::class)->assertStockQuantity($medication, $qty);
+            $fulfillmentType = $isSupplyOnly
+                ? DispenseFulfillmentType::SUPPLY_ONLY
+                : DispenseFulfillmentType::IN_HOUSE;
 
             $dispense = Dispense::query()->create([
                 'request_item_id' => $item->id,
@@ -83,6 +83,7 @@ class DispenseService
                 'expiry_date' => $data['expiry_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'dispensed_at' => now(),
+                'fulfillment_type' => $fulfillmentType,
             ]);
 
             if ($isSupplyOnly) {
@@ -93,26 +94,112 @@ class DispenseService
                 return $dispense;
             }
 
-            $task = Task::query()->firstOrCreate(
-                ['request_item_id' => $item->id],
-                [
-                    'status' => 'pending',
-                    'performed_by' => $dispensedBy->id,
-                ]
-            );
-
-            if (! $task->started_at) {
-                $task->start($dispensedBy->id);
-            }
-
-            $task->complete(TaskOutcome::COMPLETED, ['dispense_id' => $dispense->id], $data['notes'] ?? null);
+            $this->completeFulfillmentTask($item, $dispensedBy, $dispense, $data['notes'] ?? null);
 
             return $dispense;
         });
     }
 
-    protected function isPaidFor(RequestItem $item): bool
+    public function recordOutsidePurchase(RequestItem $item, User $dispensedBy, ?string $notes = null): Dispense
     {
-        return $this->policy->isPaidFor($item);
+        if (! $item->service) {
+            throw new UnauthorizedMedicationOrderException('Service is required to record outside purchase.');
+        }
+
+        $this->assertPharmacyStaff($dispensedBy);
+        $this->assertPaymentGate($item);
+
+        if ($this->policy->isControlledMedication($item)) {
+            throw new UnauthorizedMedicationOrderException('Controlled medications cannot be fulfilled via outside purchase.');
+        }
+
+        if ($item->dispenses()->where('fulfillment_type', DispenseFulfillmentType::OUTSIDE_PURCHASE)->exists()) {
+            throw new DuplicateDispenseException('Outside purchase has already been recorded for this order line.');
+        }
+
+        if ($this->hasCompletedFulfillmentDispense($item)) {
+            throw new DuplicateDispenseException('This order line has already been fulfilled.');
+        }
+
+        $medication = Medication::query()->where('service_id', $item->service_id)->first();
+
+        return DB::transaction(function () use ($item, $dispensedBy, $notes, $medication) {
+            $dispense = Dispense::query()->create([
+                'request_item_id' => $item->id,
+                'medication_id' => $medication?->id,
+                'dispensed_by' => $dispensedBy->id,
+                'quantity' => 0,
+                'unit_id' => $medication?->stock_unit_id ?? $medication?->billing_unit_id,
+                'notes' => $notes,
+                'dispensed_at' => now(),
+                'fulfillment_type' => DispenseFulfillmentType::OUTSIDE_PURCHASE,
+            ]);
+
+            $this->completeFulfillmentTask($item, $dispensedBy, $dispense, $notes);
+
+            $item->refresh();
+            if (! $item->isTerminal()) {
+                $item->markAsFulfilled($dispensedBy->id);
+            }
+
+            return $dispense;
+        });
+    }
+
+    protected function assertPharmacyStaff(User $dispensedBy): void
+    {
+        if (! $dispensedBy->hasAnyRole(['pharmacist', 'pharmacy_technician'])) {
+            throw new UnauthorizedMedicationOrderException('Only pharmacy staff can dispense.');
+        }
+    }
+
+    protected function assertPaymentGate(RequestItem $item): void
+    {
+        if ($this->policy->requiresPaymentBeforeMarOrDispense($item) && ! $this->policy->isPaidFor($item)) {
+            throw new UnauthorizedMedicationOrderException('Payment is required before dispensing this item.');
+        }
+    }
+
+    protected function hasCompletedFulfillmentDispense(RequestItem $item): bool
+    {
+        if ($item->dispenses()->where('fulfillment_type', DispenseFulfillmentType::OUTSIDE_PURCHASE)->exists()) {
+            return true;
+        }
+
+        $detail = $item->prescriptionDetail;
+        $isSupplyOnly = $detail !== null && $this->policy->requiresMar($detail);
+
+        if ($isSupplyOnly) {
+            return false;
+        }
+
+        return Dispense::query()
+            ->where('request_item_id', $item->id)
+            ->where('fulfillment_type', DispenseFulfillmentType::IN_HOUSE)
+            ->exists();
+    }
+
+    protected function completeFulfillmentTask(
+        RequestItem $item,
+        User $dispensedBy,
+        Dispense $dispense,
+        ?string $notes,
+    ): void {
+        $task = Task::query()->firstOrCreate(
+            ['request_item_id' => $item->id],
+            [
+                'status' => 'pending',
+                'performed_by' => $dispensedBy->id,
+            ]
+        );
+
+        if (! $task->started_at) {
+            $task->start($dispensedBy->id);
+        }
+
+        $task->complete(TaskOutcome::COMPLETED, [
+            'dispense_id' => $dispense->id,
+            'fulfillment_type' => $dispense->fulfillment_type?->value,
+        ], $notes);
     }
 }
