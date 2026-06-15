@@ -63,6 +63,28 @@ class PharmacyPosPrescriptionService
         return $this->buildLine($item, $branchId);
     }
 
+    /**
+     * @return Collection<int, RequestItem>
+     */
+    public function eligibleForOutsidePurchase(string $patientId, ?string $branchId = null): Collection
+    {
+        return $this->forPatient($patientId, $branchId)
+            ->filter(fn (PharmacyPosPrescriptionLine $line) => $line->canRecordOutsidePurchase)
+            ->map(fn (PharmacyPosPrescriptionLine $line) => $line->requestItem)
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, RequestItem>
+     */
+    public function eligibleForCombinedReprint(string $patientId, ?string $branchId = null): Collection
+    {
+        return $this->forPatient($patientId, $branchId)
+            ->filter(fn (PharmacyPosPrescriptionLine $line) => $line->canReprintExternalSlip)
+            ->map(fn (PharmacyPosPrescriptionLine $line) => $line->requestItem)
+            ->values();
+    }
+
     protected function buildLine(RequestItem $item, ?string $branchId): PharmacyPosPrescriptionLine
     {
         $medication = Medication::query()

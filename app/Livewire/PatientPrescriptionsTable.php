@@ -37,9 +37,18 @@ class PatientPrescriptionsTable extends Component implements HasActions, HasSche
         return $table
             ->query(fn (): Builder => $this->prescriptionsQuery())
             ->heading(__('Patient prescriptions'))
-            ->description(__('Medication orders for this patient. Dispense from hospital stock when available; if out of stock, use “Patient buys elsewhere” to print a slip for an external pharmacy.'))
+            ->description(__('Medication orders for this patient. Dispense from hospital stock when available; if out of stock, use “Patient buys elsewhere” to print one combined slip for an external pharmacy.'))
             ->defaultSort('created_at', 'desc')
             ->paginated(false)
+            ->selectable()
+            ->headerActions([
+                $this->issueAllOutsidePurchaseHeaderAction(),
+                $this->reprintCombinedSlipHeaderAction(),
+            ])
+            ->toolbarActions([
+                $this->recordOutsidePurchaseBulkAction(),
+                $this->reprintCombinedSlipBulkAction(),
+            ])
             ->columns([
                 TextColumn::make('service.name')
                     ->label(__('Medication'))

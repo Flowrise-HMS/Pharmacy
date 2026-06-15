@@ -45,8 +45,10 @@
             margin: 6px 0;
         }
         .rx-title { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
-        .med-name { font-size: 12px; font-weight: 700; margin: 4px 0; }
-        .sig { font-size: 11px; margin: 4px 0; white-space: pre-wrap; }
+        .med-block { margin: 4px 0; }
+        .med-num { font-size: 10px; }
+        .med-name { font-size: 12px; font-weight: 700; margin: 2px 0; }
+        .sig { font-size: 11px; margin: 2px 0; white-space: pre-wrap; }
         .notice {
             font-size: 10px;
             text-align: center;
@@ -84,13 +86,13 @@
         <hr class="sep">
 
         <div class="line meta">{{ __('Date') }}: {{ $issuedAt?->format('Y-m-d H:i') ?? '—' }}</div>
-        @if($item->serviceRequest?->request_number)
-            <div class="line meta">{{ __('Order') }}: {{ $item->serviceRequest->request_number }}</div>
+        @if($lines->count() > 1)
+            <div class="line meta">{{ __('Medications') }}: {{ $lines->count() }}</div>
         @endif
 
         <hr class="sep">
 
-        <div class="line"><span class="bold">{{ __('Patient') }}:</span> {{ $patient?->full_name ?? $item->serviceRequest?->guest_name ?? '—' }}</div>
+        <div class="line"><span class="bold">{{ __('Patient') }}:</span> {{ $patient?->full_name ?? '—' }}</div>
         @if($patient?->mrn)
             <div class="line meta">{{ __('MRN') }}: {{ $patient->mrn }}</div>
         @endif
@@ -105,31 +107,53 @@
 
         <hr class="sep">
 
-        <div class="line bold">{{ __('Medication') }}</div>
-        <div class="med-name">{{ $item->service?->name ?? '—' }}</div>
-        @if($item->quantity > 1)
-            <div class="line meta">{{ __('Qty') }}: {{ $item->quantity }}</div>
-        @endif
-
-        <hr class="sep">
-
-        <div class="line bold">{{ __('Directions') }}</div>
-        <div class="sig">{{ $sigLine }}</div>
-        @foreach($sigRows as $row)
-            <div class="line meta">{{ $row['label'] }}: {{ $row['value'] }}</div>
+        @foreach($lines as $index => $line)
+            <div class="med-block">
+                @if($lines->count() > 1)
+                    <div class="med-num bold">{{ $index + 1 }}. {{ __('Medication') }}</div>
+                @else
+                    <div class="line bold">{{ __('Medication') }}</div>
+                @endif
+                <div class="med-name">{{ $line->item->service?->name ?? '—' }}</div>
+                @if($line->item->quantity > 1)
+                    <div class="line meta">{{ __('Qty') }}: {{ $line->item->quantity }}</div>
+                @endif
+                @if($line->item->serviceRequest?->request_number && $lines->count() > 1)
+                    <div class="line meta">{{ __('Order') }}: {{ $line->item->serviceRequest->request_number }}</div>
+                @endif
+                <div class="line meta bold">{{ __('Directions') }}</div>
+                <div class="sig">{{ $line->sigLine }}</div>
+                @foreach($line->sigRows as $row)
+                    <div class="line meta">{{ $row['label'] }}: {{ $row['value'] }}</div>
+                @endforeach
+                @if(filled($line->outsideDispense?->notes) && $line->outsideDispense->notes !== ($sharedNotes ?? null))
+                    <div class="line meta bold">{{ __('Notes') }}</div>
+                    <div class="sig">{{ $line->outsideDispense->notes }}</div>
+                @endif
+                @if($line->prescriber)
+                    <div class="line meta">{{ __('Prescriber') }}: {{ $line->prescriber->name }}</div>
+                @endif
+            </div>
+            @if(! $loop->last)
+                <hr class="sep">
+            @endif
         @endforeach
 
-        @if(filled($outsideDispense?->notes))
+        @if(filled($sharedNotes))
             <hr class="sep">
             <div class="line bold">{{ __('Notes') }}</div>
-            <div class="sig">{{ $outsideDispense->notes }}</div>
+            <div class="sig">{{ $sharedNotes }}</div>
+        @endif
+
+        @if($lines->count() === 1 && $lines->first()->item->serviceRequest?->request_number)
+            <hr class="sep">
+            <div class="line meta">{{ __('Order') }}: {{ $lines->first()->item->serviceRequest->request_number }}</div>
         @endif
 
         <hr class="sep">
 
-        <div class="line meta">{{ __('Prescriber') }}: {{ $prescriber?->name ?? '—' }}</div>
-        @if($outsideDispense?->dispensedBy)
-            <div class="line meta">{{ __('Pharmacy') }}: {{ $outsideDispense->dispensedBy->name }}</div>
+        @if($pharmacist)
+            <div class="line meta">{{ __('Pharmacy') }}: {{ $pharmacist->name }}</div>
         @endif
 
         <hr class="sep">

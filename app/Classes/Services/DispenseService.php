@@ -4,6 +4,7 @@ namespace Modules\Pharmacy\Classes\Services;
 
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Enums\TaskOutcome;
@@ -100,13 +101,36 @@ class DispenseService
         });
     }
 
-    public function recordOutsidePurchase(RequestItem $item, User $dispensedBy, ?string $notes = null): Dispense
+    /**
+     * @param  Collection<int, RequestItem>  $items
+     * @return Collection<int, Dispense>
+     */
+    public function recordOutsidePurchaseBatch(Collection $items, User $dispensedBy, ?string $sharedNotes = null): Collection
     {
+        if ($items->isEmpty()) {
+            throw new UnauthorizedMedicationOrderException('No prescriptions selected for outside purchase.');
+        }
+
+        $this->assertPharmacyStaff($dispensedBy);
+
+        return DB::transaction(function () use ($items, $dispensedBy, $sharedNotes) {
+            return $items->map(fn (RequestItem $item) => $this->recordOutsidePurchaseWithinTransaction(
+                $item,
+                $dispensedBy,
+                $sharedNotes,
+            ));
+        });
+    }
+
+    protected function recordOutsidePurchaseWithinTransaction(
+        RequestItem $item,
+        User $dispensedBy,
+        ?string $notes = null,
+    ): Dispense {
         if (! $item->service) {
             throw new UnauthorizedMedicationOrderException('Service is required to record outside purchase.');
         }
 
-        $this->assertPharmacyStaff($dispensedBy);
         $this->assertPaymentGate($item);
 
         if ($this->policy->isControlledMedication($item)) {
@@ -123,27 +147,32 @@ class DispenseService
 
         $medication = Medication::query()->where('service_id', $item->service_id)->first();
 
-        return DB::transaction(function () use ($item, $dispensedBy, $notes, $medication) {
-            $dispense = Dispense::query()->create([
-                'request_item_id' => $item->id,
-                'medication_id' => $medication?->id,
-                'dispensed_by' => $dispensedBy->id,
-                'quantity' => 0,
-                'unit_id' => $medication?->stock_unit_id ?? $medication?->billing_unit_id,
-                'notes' => $notes,
-                'dispensed_at' => now(),
-                'fulfillment_type' => DispenseFulfillmentType::OUTSIDE_PURCHASE,
-            ]);
+        $dispense = Dispense::query()->create([
+            'request_item_id' => $item->id,
+            'medication_id' => $medication?->id,
+            'dispensed_by' => $dispensedBy->id,
+            'quantity' => 0,
+            'unit_id' => $medication?->stock_unit_id ?? $medication?->billing_unit_id,
+            'notes' => $notes,
+            'dispensed_at' => now(),
+            'fulfillment_type' => DispenseFulfillmentType::OUTSIDE_PURCHASE,
+        ]);
 
-            $this->completeFulfillmentTask($item, $dispensedBy, $dispense, $notes);
+        $this->completeFulfillmentTask($item, $dispensedBy, $dispense, $notes);
 
-            $item->refresh();
-            if (! $item->isTerminal()) {
-                $item->markAsFulfilled($dispensedBy->id);
-            }
+        $item->refresh();
+        if (! $item->isTerminal()) {
+            $item->markAsFulfilled($dispensedBy->id);
+        }
 
-            return $dispense;
-        });
+        return $dispense;
+    }
+
+    public function recordOutsidePurchase(RequestItem $item, User $dispensedBy, ?string $notes = null): Dispense
+    {
+        $this->assertPharmacyStaff($dispensedBy);
+
+        return DB::transaction(fn () => $this->recordOutsidePurchaseWithinTransaction($item, $dispensedBy, $notes));
     }
 
     protected function assertPharmacyStaff(User $dispensedBy): void

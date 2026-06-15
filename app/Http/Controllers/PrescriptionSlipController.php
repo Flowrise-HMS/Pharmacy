@@ -6,49 +6,37 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Modules\Clinical\Models\RequestItem;
-use Modules\Pharmacy\Classes\Support\PrescriptionSigFormatter;
-use Modules\Pharmacy\Enums\DispenseFulfillmentType;
-use Modules\Pharmacy\Models\Dispense;
+use Modules\Pharmacy\Classes\Services\PrescriptionSlipPresenter;
 
 class PrescriptionSlipController extends Controller
 {
-    public function show(Request $request, RequestItem $requestItem, PrescriptionSigFormatter $sigFormatter): View
+    public function show(Request $request, RequestItem $requestItem, PrescriptionSlipPresenter $presenter): View
     {
-        $requestItem->load([
-            'service',
-            'prescriptionDetail.doseUnit',
-            'serviceRequest.patient',
-            'serviceRequest.orderedBy',
-            'serviceRequest.encounter',
-            'serviceRequest.branch.organization',
-        ]);
+        return $this->renderCombined($request, $presenter, [$requestItem->id]);
+    }
 
-        abort_unless($requestItem->prescriptionDetail !== null, 404);
+    public function showCombined(Request $request, PrescriptionSlipPresenter $presenter): View
+    {
+        $items = $request->input('items', []);
 
-        $detail = $requestItem->prescriptionDetail;
+        if (is_string($items)) {
+            $items = array_filter(explode(',', $items));
+        }
 
-        /** @var Dispense|null $outsideDispense */
-        $outsideDispense = $requestItem->dispenses()
-            ->where('fulfillment_type', DispenseFulfillmentType::OUTSIDE_PURCHASE->value)
-            ->with('dispensedBy')
-            ->latest('dispensed_at')
-            ->first();
+        if (! is_array($items)) {
+            $items = [];
+        }
 
-        $branch = $requestItem->serviceRequest?->branch;
-        $patient = $requestItem->serviceRequest?->patient;
+        return $this->renderCombined($request, $presenter, $items);
+    }
 
-        return view('pharmacy::prescription-slip', [
-            'item' => $requestItem,
-            'detail' => $detail,
-            'patient' => $patient,
-            'prescriber' => $requestItem->serviceRequest?->orderedBy,
-            'encounter' => $requestItem->serviceRequest?->encounter,
-            'branch' => $branch,
-            'organization' => $branch?->organization,
-            'outsideDispense' => $outsideDispense,
-            'sigLine' => $sigFormatter->sigLine($detail),
-            'sigRows' => $sigFormatter->rows($detail),
-            'issuedAt' => $outsideDispense?->dispensed_at ?? $requestItem->serviceRequest?->created_at ?? now(),
-        ]);
+    /**
+     * @param  array<int, string>  $itemIds
+     */
+    protected function renderCombined(Request $request, PrescriptionSlipPresenter $presenter, array $itemIds): View
+    {
+        $data = $presenter->present($itemIds, $request->user(), requireOutsideDispense: true);
+
+        return view('pharmacy::prescription-slip', $data);
     }
 }

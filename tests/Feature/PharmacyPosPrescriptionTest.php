@@ -108,7 +108,7 @@ class PharmacyPosPrescriptionTest extends TestCase
         ]);
 
         $response = $this->actingAs($pharmacist)
-            ->get(route('pharmacy.prescription-slip', ['requestItem' => $item->id]));
+            ->get(route('pharmacy.prescription-slip.combined', ['items' => [$item->id]]));
 
         $response->assertOk();
         $response->assertSee('500mg');
@@ -116,6 +116,77 @@ class PharmacyPosPrescriptionTest extends TestCase
         $response->assertSee('Obtain from licensed community pharmacy');
         $response->assertSee(__('Notes'));
         $response->assertSee('80mm');
+    }
+
+    public function test_batch_outside_purchase_completes_all_items_with_shared_notes(): void
+    {
+        [$branch, $patient, $items, $pharmacist] = $this->seedMultiplePrescriptionOrders(count: 3, stockQty: 0);
+
+        app(DispenseService::class)->recordOutsidePurchaseBatch(
+            collect($items),
+            $pharmacist,
+            'Buy all at community pharmacy',
+        );
+
+        foreach ($items as $item) {
+            $this->assertTrue($item->fresh()->isCompleted());
+            $this->assertDatabaseHas('dispenses', [
+                'request_item_id' => $item->id,
+                'fulfillment_type' => DispenseFulfillmentType::OUTSIDE_PURCHASE->value,
+                'notes' => 'Buy all at community pharmacy',
+            ]);
+        }
+
+        $eligible = app(PharmacyPosPrescriptionService::class)
+            ->eligibleForCombinedReprint($patient->id, $branch->id);
+
+        $this->assertCount(3, $eligible);
+
+        $response = $this->actingAs($pharmacist)
+            ->get(route('pharmacy.prescription-slip.combined', [
+                'items' => collect($items)->pluck('id')->map(fn ($id) => (string) $id)->all(),
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('80mm');
+        $response->assertSee('Buy all at community pharmacy');
+        $response->assertSee(__('Medications').': 3');
+        $response->assertSee('500mg');
+    }
+
+    public function test_combined_slip_rejects_mixed_patients(): void
+    {
+        [, $patientA, $itemA, , $pharmacist] = $this->seedPrescriptionOrder(stockQty: 0);
+        [, , $itemB, ,] = $this->seedPrescriptionOrder(stockQty: 0);
+
+        app(DispenseService::class)->recordOutsidePurchase($itemA->fresh(), $pharmacist);
+        app(DispenseService::class)->recordOutsidePurchase($itemB->fresh(), $pharmacist);
+
+        $response = $this->actingAs($pharmacist)
+            ->get(route('pharmacy.prescription-slip.combined', [
+                'items' => [$itemA->id, $itemB->id],
+            ]));
+
+        $response->assertStatus(422);
+    }
+
+    public function test_eligible_for_outside_purchase_returns_only_out_of_stock_pending_items(): void
+    {
+        [$branch, $patient, $outOfStockItems, $pharmacist] = $this->seedMultiplePrescriptionOrders(count: 2, stockQty: 0);
+        [, , $inStockItem] = $this->seedPrescriptionOrder(
+            stockQty: 5,
+            branch: $branch,
+            patient: $patient,
+            pharmacist: $pharmacist,
+        );
+
+        $eligible = app(PharmacyPosPrescriptionService::class)
+            ->eligibleForOutsidePurchase($patient->id, $branch->id);
+
+        $this->assertCount(2, $eligible);
+        $this->assertTrue($eligible->pluck('id')->contains($outOfStockItems[0]->id));
+        $this->assertTrue($eligible->pluck('id')->contains($outOfStockItems[1]->id));
+        $this->assertFalse($eligible->pluck('id')->contains($inStockItem->id));
     }
 
     public function test_completed_outside_purchase_allows_reprint_in_panel(): void
@@ -134,7 +205,7 @@ class PharmacyPosPrescriptionTest extends TestCase
         $this->assertSame(__('External slip issued'), $line->stockLabel);
 
         $response = $this->actingAs($pharmacist)
-            ->get(route('pharmacy.prescription-slip', ['requestItem' => $item->id]));
+            ->get(route('pharmacy.prescription-slip.combined', ['items' => [$item->id]]));
 
         $response->assertOk();
     }
@@ -153,7 +224,7 @@ class PharmacyPosPrescriptionTest extends TestCase
         ]);
 
         $response = $this->actingAs($pharmacist)
-            ->get(route('pharmacy.prescription-slip', ['requestItem' => $item->id]));
+            ->get(route('pharmacy.prescription-slip.combined', ['items' => [$item->id]]));
 
         $response->assertOk();
         $response->assertSee('500mg');
@@ -202,33 +273,38 @@ class PharmacyPosPrescriptionTest extends TestCase
         bool $withMedication = true,
         bool $requiresPayment = false,
         bool $paid = true,
+        ?Branch $branch = null,
+        ?Patient $patient = null,
+        ?User $pharmacist = null,
     ): array {
-        $branch = Branch::factory()->default()->create();
-        $patient = Patient::factory()->create();
+        $branch = $branch ?? Branch::factory()->default()->create();
+        $patient = $patient ?? Patient::factory()->create();
         $orderedBy = User::factory()->create(['branch_id' => $branch->id]);
 
-        $pharmacist = User::factory()->create(['branch_id' => $branch->id]);
-        Role::findOrCreate('pharmacist', 'web');
-        $pharmacist->assignRole('pharmacist');
+        if ($pharmacist === null) {
+            $pharmacist = User::factory()->create(['branch_id' => $branch->id]);
+            Role::findOrCreate('pharmacist', 'web');
+            $pharmacist->assignRole('pharmacist');
+        }
 
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = ServiceCategory::factory()->create(['code' => 'M'.substr(uniqid(), -6)]);
         $service = Service::factory()->create([
             'category_id' => $category->id,
             'requires_payment_before' => $requiresPayment,
         ]);
 
-        $request = ServiceRequest::factory()->create([
-            'patient_id' => $patient->id,
-            'branch_id' => $branch->id,
-            'ordered_by' => $orderedBy->id,
-            'created_by' => $orderedBy->id,
-        ]);
+        $request = ServiceRequest::factory()
+            ->forPatient($patient)
+            ->create([
+                'branch_id' => $branch->id,
+                'ordered_by' => $orderedBy->id,
+                'created_by' => $orderedBy->id,
+            ]);
 
-        $item = RequestItem::factory()->create([
-            'service_request_id' => $request->id,
-            'service_id' => $service->id,
-            'status' => 'pending',
-        ]);
+        $item = RequestItem::factory()
+            ->forRequest($request)
+            ->forService($service)
+            ->create(['status' => 'pending']);
 
         PrescriptionDetail::create([
             'request_item_id' => $item->id,
@@ -279,5 +355,70 @@ class PharmacyPosPrescriptionTest extends TestCase
         }
 
         return [$branch, $patient, $item, $medication, $pharmacist];
+    }
+
+    /**
+     * @return array{Branch, Patient, array<int, RequestItem>, User}
+     */
+    protected function seedMultiplePrescriptionOrders(int $count = 2, int $stockQty = 0): array
+    {
+        $branch = Branch::factory()->default()->create();
+        $patient = Patient::factory()->create();
+        $orderedBy = User::factory()->create(['branch_id' => $branch->id]);
+
+        $pharmacist = User::factory()->create(['branch_id' => $branch->id]);
+        Role::findOrCreate('pharmacist', 'web');
+        $pharmacist->assignRole('pharmacist');
+
+        $items = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $category = ServiceCategory::factory()->create(['code' => 'M'.substr(uniqid(), -6)]);
+            $service = Service::factory()->create([
+                'category_id' => $category->id,
+                'name' => 'External Rx Med '.($i + 1),
+            ]);
+
+            $request = ServiceRequest::factory()
+                ->forPatient($patient)
+                ->create([
+                    'branch_id' => $branch->id,
+                    'ordered_by' => $orderedBy->id,
+                    'created_by' => $orderedBy->id,
+                ]);
+
+            $item = RequestItem::query()->create([
+                'service_request_id' => $request->id,
+                'service_id' => $service->id,
+                'quantity' => 1,
+                'unit_price' => $service->getDefaultPrice(),
+                'discount_amount' => 0,
+                'total_price' => $service->getDefaultPrice(),
+                'status' => 'pending',
+            ]);
+
+            PrescriptionDetail::create([
+                'request_item_id' => $item->id,
+                'frequency' => 'bid',
+                'duration_days' => 7,
+                'route' => 'po',
+                'dosage' => '500mg',
+                'administration_context' => AdministrationContext::TAKE_HOME,
+                'course_started_at' => now(),
+                'course_end_at' => now()->addDays(7),
+                'total_administrations' => 14,
+            ]);
+
+            $medication = Medication::factory()->create(['service_id' => $service->id]);
+            StockItem::factory()->create([
+                'branch_id' => $branch->id,
+                'medication_id' => $medication->id,
+                'quantity_on_hand' => $stockQty,
+            ]);
+
+            $items[] = $item->load(['service' => fn ($q) => $q->withoutGlobalScope('branch'), 'serviceRequest.patient']);
+        }
+
+        return [$branch, $patient, $items, $pharmacist];
     }
 }
