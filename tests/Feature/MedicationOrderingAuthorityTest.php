@@ -3,7 +3,7 @@
 namespace Modules\Pharmacy\Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\ServiceCategory;
@@ -13,22 +13,19 @@ use Tests\TestCase;
 
 class MedicationOrderingAuthorityTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Clinical', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Pharmacy']);
     }
 
     public function test_non_prescription_item_can_be_ordered_by_any_authenticated_user(): void
     {
         $branch = Branch::factory()->default()->create();
         $orderedBy = User::factory()->create();
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
         $service = Service::factory()->create([
             'category_id' => $category->id,
             'requires_prescription' => false,
@@ -60,7 +57,7 @@ class MedicationOrderingAuthorityTest extends TestCase
     {
         $branch = Branch::factory()->default()->create();
         $orderedBy = User::factory()->create();
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
         $service = Service::factory()->create([
             'category_id' => $category->id,
             'requires_prescription' => true,

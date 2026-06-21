@@ -2,7 +2,7 @@
 
 namespace Modules\Pharmacy\Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Enums\UnitCategory;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\ServiceCategory;
@@ -13,14 +13,12 @@ use Tests\TestCase;
 
 class MedicationUnitIntegrationTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Pharmacy']);
         $this->seed(\Modules\Core\Database\Seeders\UnitSeeder::class);
     }
 

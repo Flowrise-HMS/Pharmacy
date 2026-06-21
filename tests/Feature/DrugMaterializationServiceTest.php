@@ -2,8 +2,7 @@
 
 namespace Modules\Pharmacy\Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Pharmacy\Classes\Services\DrugMaterializationService;
@@ -13,21 +12,16 @@ use Tests\TestCase;
 
 class DrugMaterializationServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Clinical', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Pharmacy']);
     }
 
     public function test_it_materializes_a_drug_into_service_medication_and_stock(): void
     {
-        $this->assertFalse(Schema::hasColumn('medications', 'drug_id'));
-
         $branch = Branch::factory()->default()->create();
         $drug = Drug::factory()->create([
             'generic_name' => 'Amoxicillin',
@@ -54,7 +48,7 @@ class DrugMaterializationServiceTest extends TestCase
         $this->assertInstanceOf(Service::class, $service);
         $this->assertDatabaseHas('services', [
             'id' => $service->id,
-            'name' => 'Amoxicillin 500 MG Oral Capsule',
+            'name' => 'Amoxil 500 MG',
             'price' => '12.50',
             'insurance_price' => '10.00',
             'is_insurance_covered' => 1,

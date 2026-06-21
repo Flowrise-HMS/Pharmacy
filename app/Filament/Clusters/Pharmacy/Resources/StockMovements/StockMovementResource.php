@@ -11,6 +11,7 @@ use Modules\Core\Enums\NavigationGroup;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\PharmacyCluster;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Pages\CreateStockMovement;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Pages\EditStockMovement;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Pages\ListStockMovementActivities;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Pages\ListStockMovements;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Pages\ViewStockMovement;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Schemas\StockMovementForm;
@@ -57,6 +58,7 @@ class StockMovementResource extends Resource
             'create' => CreateStockMovement::route('/create'),
             'view' => ViewStockMovement::route('/{record}'),
             'edit' => EditStockMovement::route('/{record}/edit'),
+            'activities' => ListStockMovementActivities::route('/{record}/activities'),
         ];
     }
 }

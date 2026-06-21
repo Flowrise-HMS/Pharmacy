@@ -3,7 +3,7 @@
 namespace Modules\Pharmacy\Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\ServiceRequest;
 use Modules\Core\Models\Branch;
@@ -19,15 +19,12 @@ use Tests\TestCase;
 
 class DispenseServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Clinical', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Clinical', 'Pharmacy']);
     }
 
     public function test_it_dispenses_and_reduces_stock_for_authorized_pharmacy_user(): void
@@ -150,7 +147,7 @@ class DispenseServiceTest extends TestCase
     {
         $orderedBy = User::factory()->create();
         $branch = Branch::factory()->default()->create();
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,

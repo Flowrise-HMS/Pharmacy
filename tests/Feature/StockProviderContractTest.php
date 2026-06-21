@@ -2,7 +2,7 @@
 
 namespace Modules\Pharmacy\Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Pharmacy\Classes\Services\StockService;
@@ -12,15 +12,12 @@ use Tests\TestCase;
 
 class StockProviderContractTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Clinical', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Pharmacy']);
     }
 
     public function test_it_handles_increment_decrement_and_stock_checks(): void

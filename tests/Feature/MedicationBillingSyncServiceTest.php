@@ -2,7 +2,7 @@
 
 namespace Modules\Pharmacy\Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\ServiceCategory;
 use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
@@ -11,16 +11,14 @@ use Tests\TestCase;
 
 class MedicationBillingSyncServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected MedicationBillingSyncService $syncService;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Pharmacy']);
 
         $this->syncService = app(MedicationBillingSyncService::class);
     }

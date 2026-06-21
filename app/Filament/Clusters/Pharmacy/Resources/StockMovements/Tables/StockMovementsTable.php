@@ -2,6 +2,7 @@
 
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\Tables;
 
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -75,6 +76,10 @@ class StockMovementsTable
                     ViewAction::make(),
                     EditAction::make(),
                     DeleteAction::make(),
+                    Action::make('activities')
+                        ->label('Activities')
+                        ->icon('heroicon-o-bell-alert')
+                        ->url(fn ($record) => \Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\StockMovementResource::getUrl('activities', ['record' => $record])),
                 ])
             ])
             ->toolbarActions([

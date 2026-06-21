@@ -2,6 +2,7 @@
 
 namespace Modules\Pharmacy\Tests\Unit;
 
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Enums\UnitCategory;
 use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Classes\Support\MedicationQuantityValidator;
@@ -10,13 +11,14 @@ use Tests\TestCase;
 
 class MedicationQuantityValidatorTest extends TestCase
 {
+    use DatabaseTransactions;
+
     private MedicationQuantityValidator $validator;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
+        $this->migrateModules(['Core']);
         $this->seed(\Modules\Core\Database\Seeders\UnitSeeder::class);
 
         $this->validator = new MedicationQuantityValidator;
@@ -30,7 +32,7 @@ class MedicationQuantityValidatorTest extends TestCase
 
         $this->validator->assertStockQuantity($medication, 5, 'stock');
 
-        $this->expectNotToPerformAssertions();
+        $this->assertSame(5, 5);
     }
 
     public function test_assert_stock_quantity_rejects_float_for_non_fractional_unit(): void
@@ -56,7 +58,7 @@ class MedicationQuantityValidatorTest extends TestCase
 
         $this->validator->assertStockQuantity($medication, 1.5, 'stock');
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 
     public function test_assert_stock_quantity_rejects_negative(): void
@@ -73,18 +75,18 @@ class MedicationQuantityValidatorTest extends TestCase
 
     public function test_assert_stock_quantity_skips_when_no_unit(): void
     {
-        $medication = $this->createMock(Medication::class);
+        $medication = $this->createStub(Medication::class);
 
         $this->validator->assertStockQuantity($medication, 5, 'stock');
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 
     public function test_assert_billing_quantity_accepts_valid(): void
     {
         $this->validator->assertBillingQuantity(1);
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 
     public function test_assert_billing_quantity_rejects_zero(): void
@@ -99,7 +101,7 @@ class MedicationQuantityValidatorTest extends TestCase
     {
         $this->validator->assertDoseDoesNotExceedRemaining(3, 5);
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 
     public function test_assert_dose_exceeds_remaining_throws(): void
@@ -114,7 +116,7 @@ class MedicationQuantityValidatorTest extends TestCase
     {
         $this->validator->assertUnitsMatch(null, null, 'test');
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 
     public function test_assert_units_match_passes_when_matching(): void
@@ -123,7 +125,7 @@ class MedicationQuantityValidatorTest extends TestCase
 
         $this->validator->assertUnitsMatch($tablet, $tablet, 'test');
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 
     public function test_assert_units_match_throws_on_mismatch(): void
@@ -143,7 +145,7 @@ class MedicationQuantityValidatorTest extends TestCase
 
         $this->validator->assertUnitsMatch(null, $capsule, 'test');
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 
     public function test_assert_units_match_skips_when_actual_null(): void
@@ -152,6 +154,6 @@ class MedicationQuantityValidatorTest extends TestCase
 
         $this->validator->assertUnitsMatch($tablet, null, 'test');
 
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue(true);
     }
 }

@@ -3,7 +3,7 @@
 namespace Modules\Pharmacy\Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Billing\Enums\InvoiceStatus;
 use Modules\Billing\Enums\PaymentMethod;
 use Modules\Core\Models\Branch;
@@ -18,17 +18,12 @@ use Tests\TestCase;
 
 class PharmacyPosCheckoutTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Clinical', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Patient', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Billing', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Billing', 'Pharmacy']);
     }
 
     public function test_it_processes_guest_checkout_and_decrements_stock(): void
@@ -37,7 +32,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,
@@ -94,7 +89,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,
@@ -134,7 +129,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,
@@ -172,7 +167,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,
@@ -216,7 +211,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,
@@ -256,7 +251,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,
@@ -296,7 +291,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,
@@ -339,7 +334,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::factory()->create(['is_active' => true]);
-        $category = ServiceCategory::factory()->create(['code' => 'MED']);
+        $category = $this->medicationServiceCategory();
 
         $service = Service::factory()->create([
             'category_id' => $category->id,

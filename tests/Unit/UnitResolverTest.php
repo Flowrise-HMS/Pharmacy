@@ -2,6 +2,7 @@
 
 namespace Modules\Pharmacy\Tests\Unit;
 
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Enums\UnitCategory;
 use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Classes\Support\UnitResolver;
@@ -10,13 +11,14 @@ use Tests\TestCase;
 
 class UnitResolverTest extends TestCase
 {
+    use DatabaseTransactions;
+
     private UnitResolver $resolver;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
+        $this->migrateModules(['Core']);
         $this->seed(\Modules\Core\Database\Seeders\UnitSeeder::class);
 
         $this->resolver = new UnitResolver;

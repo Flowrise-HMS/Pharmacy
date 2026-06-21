@@ -3,7 +3,7 @@
 namespace Modules\Pharmacy\Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Classes\Services\DrugMaterializationService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
@@ -12,15 +12,12 @@ use Tests\TestCase;
 
 class DrugBackedMedicationOrderingTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Clinical', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Pharmacy']);
     }
 
     public function test_a_drug_reference_resolves_to_a_service_id_before_order_creation(): void

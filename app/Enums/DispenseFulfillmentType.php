@@ -2,7 +2,9 @@
 
 namespace Modules\Pharmacy\Enums;
 
-enum DispenseFulfillmentType: string
+use Filament\Support\Contracts\HasLabel;
+
+enum DispenseFulfillmentType: string implements HasLabel
 {
     case IN_HOUSE = 'in_house';
     case OUTSIDE_PURCHASE = 'outside_purchase';

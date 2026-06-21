@@ -3,7 +3,7 @@
 namespace Modules\Pharmacy\Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Billing\Enums\InvoiceLineStatus;
 use Modules\Billing\Enums\InvoiceStatus;
 use Modules\Billing\Enums\InvoiceType;
@@ -29,7 +29,7 @@ use Tests\TestCase;
 
 class PharmacyPosPrescriptionTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
@@ -37,11 +37,7 @@ class PharmacyPosPrescriptionTest extends TestCase
 
         config(['clinical.mar_payment.require_before_mar' => false]);
 
-        $this->artisan('module:migrate', ['module' => 'Core', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Patient', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Billing', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Clinical', '--force' => true]);
-        $this->artisan('module:migrate', ['module' => 'Pharmacy', '--force' => true]);
+        $this->migrateModules(['Core', 'Patient', 'Clinical', 'Billing', 'Pharmacy']);
     }
 
     public function test_zero_stock_prescription_appears_in_panel_query_not_retail_catalog(): void
