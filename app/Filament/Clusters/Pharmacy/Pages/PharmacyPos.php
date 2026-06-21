@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Modules\Billing\Enums\PaymentMethod;
 use Modules\Core\Classes\Services\BranchService;
+use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\ServiceCategory;
@@ -368,9 +369,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->label(__('Category'))
                 ->badge()
                 ->color('gray'),
-            TextColumn::make('price')
+            CurrencyColumn::make('price')
                 ->label(__('Price'))
-                ->money(config('core.default_currency'))
                 ->alignRight()
                 ->weight('bold'),
         ];
@@ -392,10 +392,9 @@ class PharmacyPos extends Page implements HasActions, HasTable
             TextColumn::make('strength')
                 ->label(__('Strength'))
                 ->placeholder('—'),
-            TextColumn::make('price')
+            CurrencyColumn::make('price')
                 ->label(__('Price'))
                 ->state(fn (?Medication $record): string => $record?->billingService()?->price ?? '0')
-                ->money(config('core.default_currency'))
                 ->alignRight()
                 ->weight('bold'),
             TextColumn::make('stock_qty')

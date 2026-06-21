@@ -6,6 +6,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Modules\Core\Filament\Concerns\InteractsWithWidgetShield;
+use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\PharmacyCluster;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Widgets\Concerns\InteractsWithReportPayload;
 
@@ -36,7 +37,7 @@ class RecentPosSalesTableWidget extends BaseWidget
                     ->badge()
                     ->color(fn (string $state): string => $state === 'service' ? 'info' : 'success'),
                 TextColumn::make('description')->label(__('Description')),
-                TextColumn::make('amount')->label(__('Amount'))->numeric(decimalPlaces: 2),
+                CurrencyColumn::make('amount')->label(__('Amount')),
             ])
             ->paginated(false)
             ->emptyStateHeading(__('No POS sales in range'));

@@ -16,6 +16,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\ServiceCategoryCode;
+use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
@@ -46,9 +47,8 @@ class MedicationsTable
                         $qty = $record->stock_items_sum_quantity_on_hand ?? 0;
                         return $qty . ' ' . ($record->stockUnit?->label ?? '');
                     }),
-                TextColumn::make('service.price')
+                CurrencyColumn::make('service.price')
                     ->label('Cash price')
-                    ->money(config('core.default_currency'))
                     ->default(0),
                 TextColumn::make('billing_status')
                     ->label('Billing')

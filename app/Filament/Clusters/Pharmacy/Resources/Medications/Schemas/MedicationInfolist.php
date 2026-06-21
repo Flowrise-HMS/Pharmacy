@@ -6,6 +6,7 @@ use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Modules\Core\Filament\Infolists\Components\CurrencyEntry;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
 
@@ -56,8 +57,8 @@ class MedicationInfolist
                     ]),
                 Section::make('Pricing')
                     ->schema([
-                        TextEntry::make('service.price')->label('Cash price')->money(config('core.default_currency')),
-                        TextEntry::make('service.insurance_price')->label('Insurance price')->money(config('core.default_currency')),
+                        CurrencyEntry::make('service.price')->label('Cash price'),
+                        CurrencyEntry::make('service.insurance_price')->label('Insurance price'),
                         TextEntry::make('service.is_insurance_covered')->label('Insurance covered')->badge()->formatStateUsing(fn ($state) => $state ? 'Yes' : 'No'),
                     ])
                     ->visible(fn (Medication $record) => $record->billingService() !== null),
