@@ -17,6 +17,7 @@
                 >
                     {{ __('Medications') }}
                 </x-filament::tabs.item>
+                @if($this->showServicesTab())
                 <x-filament::tabs.item
                     :active="$activeTab === 'services'"
                     wire:click="$set('activeTab', 'services')"
@@ -24,6 +25,7 @@
                 >
                     {{ __('Services') }}
                 </x-filament::tabs.item>
+                @endif
             </x-filament::tabs>
 
             <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 space-y-3">
@@ -269,10 +271,17 @@
                             <select wire:model.live="paymentMethod"
                                 class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm py-2 px-3 focus:ring-primary-500 focus:border-primary-500"
                                 @disabled($cart->isEmpty())>
-                                <option value="cash">{{ __('Cash') }}</option>
-                                <option value="card">{{ __('Card') }}</option>
-                                <option value="bank_transfer">{{ __('Bank Transfer') }}</option>
-                                <option value="mobile_money">{{ __('Mobile Money') }}</option>
+                                @foreach($this->enabledPaymentMethods() as $method)
+                                    <option value="{{ $method }}">
+                                        @switch($method)
+                                            @case('cash') {{ __('Cash') }} @break
+                                            @case('card') {{ __('Card') }} @break
+                                            @case('bank_transfer') {{ __('Bank Transfer') }} @break
+                                            @case('mobile_money') {{ __('Mobile Money') }} @break
+                                            @default {{ ucfirst(str_replace('_', ' ', $method)) }}
+                                        @endswitch
+                                    </option>
+                                @endforeach
                             </select>
                         </div>
                     @endif

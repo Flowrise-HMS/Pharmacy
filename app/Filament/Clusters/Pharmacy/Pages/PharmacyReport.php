@@ -173,4 +173,13 @@ class PharmacyReport extends Page
             'channel' => $this->channel,
         ]);
     }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        try {
+            return app(\Modules\Core\Settings\FeatureSettings::class)->pharmacy_reports_enabled;
+        } catch (\Throwable) {
+            return true;
+        }
+    }
 }

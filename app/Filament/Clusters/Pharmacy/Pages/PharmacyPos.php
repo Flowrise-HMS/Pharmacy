@@ -104,6 +104,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->activeTab = Session::get('pharmacy_pos_active_tab', 'medications');
         $this->selectedBranchId = $this->resolveDefaultBranchId();
         $this->cartCacheKey = 'pharmacy_pos_user_'.Auth::id().'_branch_'.($this->selectedBranchId ?? 'default');
+        $this->chargeMode = app_settings($this->selectedBranchId)->pharmacyPosDefaultChargeMode();
         $this->restoreCartFromCache();
         $this->calculateGrandTotal();
     }
@@ -134,6 +135,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
     {
         $this->cartCacheKey = 'pharmacy_pos_user_'.Auth::id().'_branch_'.($value ?? 'default');
         $this->cart = collect();
+        $this->chargeMode = app_settings($value)->pharmacyPosDefaultChargeMode();
+        if (! $this->canCreatePayment() && $this->chargeMode === 'pay_now') {
+            $this->chargeMode = 'charge_account';
+        }
         $this->calculateGrandTotal();
         $this->clearCartCache();
         $this->resetTable();
@@ -630,6 +635,15 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
+        if (! in_array($this->paymentMethod, $this->enabledPaymentMethods(), true)) {
+            Notification::make()
+                ->danger()
+                ->title(__('Payment method not allowed'))
+                ->send();
+
+            return;
+        }
+
         try {
             $amountTendered = $this->amountPaid !== null && $this->amountPaid !== ''
                 ? PharmacyPosTotals::normalizeMoney($this->amountPaid)
@@ -641,7 +655,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'guest_name' => $this->selectedPatientId ? null : $this->guestName,
                 'guest_phone' => $this->selectedPatientId ? null : $this->guestPhone,
                 'guest_email' => $this->selectedPatientId ? null : $this->guestEmail,
-                'currency' => config('core.default_currency'),
+                'currency' => app_settings($this->selectedBranchId)->currencyCode(),
                 'cart' => $this->cart->map(fn ($item) => [
                     'type' => $item['type'] ?? 'medication',
                     'id' => $item['id'],
@@ -691,7 +705,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'guest_name' => $this->selectedPatientId ? null : $this->guestName,
                 'guest_phone' => $this->selectedPatientId ? null : $this->guestPhone,
                 'guest_email' => $this->selectedPatientId ? null : $this->guestEmail,
-                'currency' => config('core.default_currency'),
+                'currency' => app_settings($this->selectedBranchId)->currencyCode(),
                 'cart' => $this->cart->map(fn ($item) => [
                     'type' => $item['type'] ?? 'medication',
                     'id' => $item['id'],
@@ -838,7 +852,31 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function canCreatePayment(): bool
     {
+        if (! app_settings($this->selectedBranchId)->pharmacyPosCollectPaymentEnabled()) {
+            return false;
+        }
+
         return auth()->user()?->can('create', \Modules\Billing\Models\Payment::class) ?? false;
+    }
+
+    /** @return array<int, string> */
+    public function enabledPaymentMethods(): array
+    {
+        return app_settings($this->selectedBranchId)->pharmacyPosPaymentMethods();
+    }
+
+    public function showServicesTab(): bool
+    {
+        return app_settings($this->selectedBranchId)->pharmacyServicesTabEnabled();
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        try {
+            return app(\Modules\Core\Settings\FeatureSettings::class)->pharmacy_pos_enabled;
+        } catch (\Throwable) {
+            return true;
+        }
     }
 
     protected function getHeaderActions(): array

@@ -32,12 +32,25 @@ class DrugSearchService
 
         $results = $localDrugResults->concat($localMedicationResults);
 
-        if (config('pharmacy.enable_external_drug_lookup', false)) {
+        if ($this->externalLookupEnabled()) {
             $externalResults = collect($this->externalDrugLookupService->search($query, 'rxnorm', $limit));
             $results = $results->concat($externalResults);
         }
 
         return $results->take($limit)->values()->all();
+    }
+
+    protected function externalLookupEnabled(): bool
+    {
+        if (config('pharmacy.enable_external_drug_lookup', false)) {
+            return true;
+        }
+
+        try {
+            return app(\Modules\Core\Settings\PharmacySettings::class)->external_drug_lookup;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

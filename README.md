@@ -35,6 +35,7 @@ flowchart LR
 - Track **stock items** and stock movement reasons.
 - Place and process **medication orders**.
 - Record **dispensing events** against clinical request items.
+- Run **Pharmacy POS** checkout for walk-in or OTC sales.
 - Enforce safety/business checks (for example insufficient stock exceptions).
 
 ## How it works (simple)
@@ -66,6 +67,7 @@ See [module status](../../docs/shared/module-status.md) for rollout state.
 
 ## Further reading
 
+- **Staff-facing workflows:** [Pharmacy Workflows](../../docs/user-guide/pharmacy.md)
 - Project-level docs: [docs/README.md](../../docs/README.md)
 - Clinical workflows context: [docs/user-guide/clinical-workflows.md](../../docs/user-guide/clinical-workflows.md)
 
