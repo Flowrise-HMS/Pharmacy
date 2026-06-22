@@ -77,7 +77,7 @@
                     @endif
                 </div>
 
-                @if(!$selectedPatientId)
+                @if(!$selectedPatientId && $this->showGuestCheckout())
                     <div class="flex gap-2">
                         <x-filament::input
                             type="text"

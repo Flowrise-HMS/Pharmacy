@@ -106,6 +106,11 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->cartCacheKey = 'pharmacy_pos_user_'.Auth::id().'_branch_'.($this->selectedBranchId ?? 'default');
         $this->chargeMode = app_settings($this->selectedBranchId)->pharmacyPosDefaultChargeMode();
         $this->restoreCartFromCache();
+        if (! $this->showGuestCheckout()) {
+            $this->guestName = null;
+            $this->guestPhone = null;
+            $this->guestEmail = null;
+        }
         $this->calculateGrandTotal();
     }
 
@@ -138,6 +143,11 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->chargeMode = app_settings($value)->pharmacyPosDefaultChargeMode();
         if (! $this->canCreatePayment() && $this->chargeMode === 'pay_now') {
             $this->chargeMode = 'charge_account';
+        }
+        if (! $this->showGuestCheckout()) {
+            $this->guestName = null;
+            $this->guestPhone = null;
+            $this->guestEmail = null;
         }
         $this->calculateGrandTotal();
         $this->clearCartCache();
@@ -607,14 +617,26 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
-        if (! $this->selectedPatientId && blank($this->guestName) && blank($this->guestPhone)) {
-            Notification::make()
-                ->danger()
-                ->title(__('Owner required'))
-                ->body(__('Select a patient or enter the guest name / phone.'))
-                ->send();
+        if (! $this->selectedPatientId) {
+            if (! $this->showGuestCheckout()) {
+                Notification::make()
+                    ->danger()
+                    ->title(__('Patient required'))
+                    ->body(__('Guest checkout is disabled. Select a patient to continue.'))
+                    ->send();
 
-            return;
+                return;
+            }
+
+            if (blank($this->guestName) && blank($this->guestPhone)) {
+                Notification::make()
+                    ->danger()
+                    ->title(__('Owner required'))
+                    ->body(__('Select a patient or enter the guest name / phone.'))
+                    ->send();
+
+                return;
+            }
         }
 
         $subtotal = PharmacyPosTotals::cartSubtotal($this->cart);
@@ -868,6 +890,11 @@ class PharmacyPos extends Page implements HasActions, HasTable
     public function showServicesTab(): bool
     {
         return app_settings($this->selectedBranchId)->pharmacyServicesTabEnabled();
+    }
+
+    public function showGuestCheckout(): bool
+    {
+        return app_settings($this->selectedBranchId)->pharmacyGuestCheckoutEnabled();
     }
 
     public static function shouldRegisterNavigation(): bool
