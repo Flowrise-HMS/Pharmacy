@@ -78,7 +78,6 @@
                 </div>
 
                 @if(!$selectedPatientId && $this->showGuestCheckout())
-                <hr>
                     <div class="flex gap-2">
                         <x-filament::input
                             type="text"
