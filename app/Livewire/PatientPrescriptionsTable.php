@@ -17,6 +17,7 @@ use Livewire\Component;
 use Modules\Billing\Enums\InvoiceLineStatus;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Pharmacy\Classes\Services\PharmacyPosPrescriptionService;
+use Modules\Pharmacy\Enums\DispenseFulfillmentType;
 use Modules\Pharmacy\Filament\Concerns\HandlesPosPrescriptionFulfillmentActions;
 
 class PatientPrescriptionsTable extends Component implements HasActions, HasSchemas, HasTable
@@ -139,7 +140,7 @@ class PatientPrescriptionsTable extends Component implements HasActions, HasSche
             ->where(function (Builder $q) {
                 $q->whereIn('status', ['pending', 'in_progress'])
                     ->orWhereHas('dispenses', fn (Builder $d) => $d
-                        ->where('fulfillment_type', \Modules\Pharmacy\Enums\DispenseFulfillmentType::OUTSIDE_PURCHASE->value));
+                        ->where('fulfillment_type', DispenseFulfillmentType::OUTSIDE_PURCHASE->value));
             })
             ->with([
                 'service',

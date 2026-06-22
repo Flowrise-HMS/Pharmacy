@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\RequestItem;
+use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Enums\AdministrationContext;
 
 class PrescriptionDetail extends Model
@@ -57,7 +58,7 @@ class PrescriptionDetail extends Model
 
     public function doseUnit(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'dose_unit_id');
+        return $this->belongsTo(Unit::class, 'dose_unit_id');
     }
 
     public function isInFacility(): bool

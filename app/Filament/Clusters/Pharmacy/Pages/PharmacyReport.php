@@ -7,6 +7,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\WidgetConfiguration;
 use Modules\Core\Models\Branch;
+use Modules\Core\Settings\FeatureSettings;
 use Modules\Pharmacy\Classes\Services\PharmacyAnalyticsService;
 use Modules\Pharmacy\Data\PharmacyReportCriteria;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\PharmacyCluster;
@@ -177,7 +178,7 @@ class PharmacyReport extends Page
     public static function shouldRegisterNavigation(): bool
     {
         try {
-            return app(\Modules\Core\Settings\FeatureSettings::class)->pharmacy_reports_enabled;
+            return app(FeatureSettings::class)->pharmacy_reports_enabled;
         } catch (\Throwable) {
             return true;
         }

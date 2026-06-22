@@ -7,7 +7,6 @@ use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Models\Encounter;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Pharmacy\Classes\Services\PrescriptionScheduleCalculator;
-use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 
 class BackfillPrescriptionDetailsCommand extends Command

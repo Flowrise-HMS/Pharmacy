@@ -8,11 +8,12 @@ use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\ServiceRequest;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
-use Modules\Core\Models\ServiceCategory;
 use Modules\Pharmacy\Classes\Services\DispenseService;
+use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Exceptions\DuplicateDispenseException;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Models\PrescriptionDetail;
 use Modules\Pharmacy\Models\StockItem;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -90,7 +91,7 @@ class DispenseServiceTest extends TestCase
     {
         [$branch, , $requestItem, $medication] = $this->seedDispenseFixture(false);
         $requestItem->prescriptionDetail->update([
-            'administration_context' => \Modules\Pharmacy\Enums\AdministrationContext::IN_FACILITY,
+            'administration_context' => AdministrationContext::IN_FACILITY,
         ]);
 
         StockItem::factory()->create([
@@ -177,12 +178,12 @@ class DispenseServiceTest extends TestCase
             'service_id' => $service->id,
         ]);
 
-        \Modules\Pharmacy\Models\PrescriptionDetail::create([
+        PrescriptionDetail::create([
             'request_item_id' => $item->id,
             'frequency' => 'bid',
             'duration_days' => 7,
             'route' => 'po',
-            'administration_context' => \Modules\Pharmacy\Enums\AdministrationContext::TAKE_HOME,
+            'administration_context' => AdministrationContext::TAKE_HOME,
             'course_started_at' => now(),
             'course_end_at' => now()->addDays(7),
             'total_administrations' => 14,

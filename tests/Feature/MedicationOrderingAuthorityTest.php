@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
-use Modules\Core\Models\ServiceCategory;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Tests\TestCase;

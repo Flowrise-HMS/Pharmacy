@@ -253,7 +253,7 @@ trait HandlesPosPrescriptionFulfillmentActions
     /**
      * @param  Collection<int, RequestItem>|array<int, RequestItem>  $items
      */
-    protected function issueOutsidePurchaseAndPrint(Collection | array $items, ?string $notes = null): void
+    protected function issueOutsidePurchaseAndPrint(Collection|array $items, ?string $notes = null): void
     {
         $items = $items instanceof Collection ? $items : collect($items);
 

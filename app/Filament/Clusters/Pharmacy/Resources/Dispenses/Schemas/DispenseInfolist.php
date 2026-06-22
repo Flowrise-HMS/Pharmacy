@@ -16,7 +16,7 @@ class DispenseInfolist
                 TextEntry::make('requestItem.service.name')->label('Service'),
                 TextEntry::make('medication.generic_name')->label('Medication'),
                 TextEntry::make('quantity')
-                    ->formatStateUsing(fn (Dispense $record): string => $record->quantity . ' ' . ($record->unit?->label ?? '')),
+                    ->formatStateUsing(fn (Dispense $record): string => $record->quantity.' '.($record->unit?->label ?? '')),
                 TextEntry::make('batch_number'),
                 TextEntry::make('expiry_date')->date(),
                 TextEntry::make('dispensedBy.name')->label('Dispensed by'),

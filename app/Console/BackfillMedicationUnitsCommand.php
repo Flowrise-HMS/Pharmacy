@@ -36,6 +36,7 @@ class BackfillMedicationUnitsCommand extends Command
         foreach ($medications as $medication) {
             if (! $medication->dosage_form) {
                 $bar->advance();
+
                 continue;
             }
 
@@ -46,6 +47,7 @@ class BackfillMedicationUnitsCommand extends Command
 
             if (! $stockUnitId && ! $billingUnitId) {
                 $bar->advance();
+
                 continue;
             }
 

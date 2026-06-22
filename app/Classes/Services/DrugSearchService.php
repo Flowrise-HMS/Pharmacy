@@ -3,6 +3,7 @@
 namespace Modules\Pharmacy\Classes\Services;
 
 use Illuminate\Support\Collection;
+use Modules\Core\Settings\PharmacySettings;
 use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
 
@@ -47,7 +48,7 @@ class DrugSearchService
         }
 
         try {
-            return app(\Modules\Core\Settings\PharmacySettings::class)->external_drug_lookup;
+            return app(PharmacySettings::class)->external_drug_lookup;
         } catch (\Throwable) {
             return false;
         }

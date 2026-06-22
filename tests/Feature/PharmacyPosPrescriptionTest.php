@@ -153,7 +153,7 @@ class PharmacyPosPrescriptionTest extends TestCase
     public function test_combined_slip_rejects_mixed_patients(): void
     {
         [, $patientA, $itemA, , $pharmacist] = $this->seedPrescriptionOrder(stockQty: 0);
-        [, , $itemB, ,] = $this->seedPrescriptionOrder(stockQty: 0);
+        [, , $itemB] = $this->seedPrescriptionOrder(stockQty: 0);
 
         app(DispenseService::class)->recordOutsidePurchase($itemA->fresh(), $pharmacist);
         app(DispenseService::class)->recordOutsidePurchase($itemB->fresh(), $pharmacist);

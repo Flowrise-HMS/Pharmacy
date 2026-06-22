@@ -3,7 +3,7 @@
 namespace Modules\Pharmacy\Tests\Unit;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Modules\Core\Enums\UnitCategory;
+use Modules\Core\Database\Seeders\UnitSeeder;
 use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Classes\Support\UnitResolver;
 use Modules\Pharmacy\Enums\DosageForm;
@@ -19,7 +19,7 @@ class UnitResolverTest extends TestCase
     {
         parent::setUp();
         $this->migrateModules(['Core']);
-        $this->seed(\Modules\Core\Database\Seeders\UnitSeeder::class);
+        $this->seed(UnitSeeder::class);
 
         $this->resolver = new UnitResolver;
     }

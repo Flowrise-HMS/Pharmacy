@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\RequestItem;
+use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Database\Factories\DispenseFactory;
 use Modules\Pharmacy\Enums\DispenseFulfillmentType;
 
@@ -58,11 +59,11 @@ class Dispense extends Model
 
     public function unit(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Core\Models\Unit::class);
+        return $this->belongsTo(Unit::class);
     }
 
     public function getQuantityWithUnitAttribute(): string
     {
-        return $this->quantity . ' ' . ($this->unit?->label ?? '');
+        return $this->quantity.' '.($this->unit?->label ?? '');
     }
 }

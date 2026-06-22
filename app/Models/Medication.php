@@ -2,16 +2,17 @@
 
 namespace Modules\Pharmacy\Models;
 
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\Service;
+use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Database\Factories\MedicationFactory;
 use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Enums\DosageForm;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Modules\Pharmacy\Observers\MedicationObserver;
 
 #[ObservedBy([MedicationObserver::class])]
@@ -111,16 +112,16 @@ class Medication extends Model
 
     public function stockUnit(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'stock_unit_id');
+        return $this->belongsTo(Unit::class, 'stock_unit_id');
     }
 
     public function billingUnit(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'billing_unit_id');
+        return $this->belongsTo(Unit::class, 'billing_unit_id');
     }
 
     public function doseUnit(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Core\Models\Unit::class, 'dose_unit_id');
+        return $this->belongsTo(Unit::class, 'dose_unit_id');
     }
 }

@@ -17,7 +17,7 @@ class DispensesTable
                 TextColumn::make('medication.generic_name')->label('Medication')->searchable(),
                 TextColumn::make('quantity')
                     ->sortable()
-                    ->formatStateUsing(fn (Dispense $record): string => $record->quantity . ' ' . ($record->unit?->label ?? '')),
+                    ->formatStateUsing(fn (Dispense $record): string => $record->quantity.' '.($record->unit?->label ?? '')),
                 TextColumn::make('dispensedBy.name')->label('Dispensed by')->searchable(),
                 TextColumn::make('dispensed_at')->dateTime()->sortable(),
                 TextColumn::make('batch_number')->toggleable(),

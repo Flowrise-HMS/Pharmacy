@@ -14,7 +14,6 @@ use Modules\Billing\Models\InvoiceLine;
 use Modules\Clinical\Database\Factories\RequestItemFactory;
 use Modules\Clinical\Database\Factories\ServiceRequestFactory;
 use Modules\Clinical\Enums\RequestItemStatus;
-use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Database\Factories\BranchFactory;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;

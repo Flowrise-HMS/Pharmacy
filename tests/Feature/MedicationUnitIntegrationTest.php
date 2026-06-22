@@ -3,10 +3,10 @@
 namespace Modules\Pharmacy\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Modules\Core\Enums\UnitCategory;
+use Modules\Core\Database\Seeders\UnitSeeder;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\ServiceCategory;
-use Modules\Pharmacy\Classes\Support\UnitResolver;
+use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Models\Medication;
 use Tests\TestCase;
@@ -19,7 +19,7 @@ class MedicationUnitIntegrationTest extends TestCase
     {
         parent::setUp();
         $this->migrateModules(['Core', 'Patient', 'Pharmacy']);
-        $this->seed(\Modules\Core\Database\Seeders\UnitSeeder::class);
+        $this->seed(UnitSeeder::class);
     }
 
     public function test_observer_auto_sets_units_on_create(): void
@@ -54,8 +54,8 @@ class MedicationUnitIntegrationTest extends TestCase
         $category = ServiceCategory::factory()->create();
         $service = Service::factory()->create(['category_id' => $category->id]);
 
-        $tablet = \Modules\Core\Models\Unit::where('code', 'tablet')->first();
-        $capsule = \Modules\Core\Models\Unit::where('code', 'capsule')->first();
+        $tablet = Unit::where('code', 'tablet')->first();
+        $capsule = Unit::where('code', 'capsule')->first();
 
         $medication = Medication::factory()->create([
             'service_id' => $service->id,
@@ -159,7 +159,7 @@ class MedicationUnitIntegrationTest extends TestCase
         $category = ServiceCategory::factory()->create();
         $service = Service::factory()->create(['category_id' => $category->id]);
 
-        $tablet = \Modules\Core\Models\Unit::where('code', 'tablet')->first();
+        $tablet = Unit::where('code', 'tablet')->first();
 
         Medication::withoutEvents(fn () => Medication::factory()->create([
             'service_id' => $service->id,

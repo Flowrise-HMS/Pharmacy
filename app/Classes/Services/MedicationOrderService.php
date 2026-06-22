@@ -5,15 +5,15 @@ namespace Modules\Pharmacy\Classes\Services;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
-use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Classes\Services\MedicationDoseScheduleService;
+use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Classes\Services\ServiceRequestService;
 use Modules\Clinical\Models\Encounter;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Clinical\Models\ServiceRequest;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
-use Modules\Pharmacy\Enums\MedicationFrequency;
+use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
@@ -104,7 +104,7 @@ class MedicationOrderService
         $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $administerInFacility = filter_var($itemData['administer_in_facility'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $context = isset($itemData['administration_context'])
-            ? \Modules\Pharmacy\Enums\AdministrationContext::tryFrom($itemData['administration_context'])
+            ? AdministrationContext::tryFrom($itemData['administration_context'])
             : null;
 
         $context ??= $this->fulfillmentPolicy->defaultAdministrationContext(

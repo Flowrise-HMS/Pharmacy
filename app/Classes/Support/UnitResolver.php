@@ -2,7 +2,6 @@
 
 namespace Modules\Pharmacy\Classes\Support;
 
-use Modules\Core\Enums\UnitCategory;
 use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Enums\DosageForm;
 

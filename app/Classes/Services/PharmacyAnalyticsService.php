@@ -11,6 +11,7 @@ use Modules\Clinical\Enums\RequestItemStatus;
 use Modules\Clinical\Models\MedicationAdministration;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Branch;
+use Modules\Core\Models\Service;
 use Modules\Pharmacy\Data\PharmacyReportCriteria;
 use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Enums\DispenseFulfillmentType;
@@ -338,7 +339,7 @@ class PharmacyAnalyticsService
             ->get();
 
         return $rows->map(function ($row): array {
-            $service = \Modules\Core\Models\Service::query()->find($row->service_id);
+            $service = Service::query()->find($row->service_id);
 
             return [
                 'label' => $service?->name ?? __('Unknown'),
@@ -365,7 +366,7 @@ class PharmacyAnalyticsService
             ->get();
 
         return $rows->map(function ($row): array {
-            $service = \Modules\Core\Models\Service::query()->find($row->service_id);
+            $service = Service::query()->find($row->service_id);
 
             return [
                 'label' => $service?->name ?? __('Unknown'),

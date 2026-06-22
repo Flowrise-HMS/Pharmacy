@@ -30,15 +30,17 @@ class ImportFDANdcDrugData extends Command
     /**
      * Execute the console command.
      */
-    public function handle() {
+    public function handle()
+    {
         $this->info('Starting NDC import...');
 
         $path = __DIR__.'/../../resources/assets/data/drug-ndc-0001-of-0001.json';
 
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             $this->error("File not found: {$path}");
             $this->info('Download it from: https://download.open.fda.gov/drug/ndc/drug-ndc-0001-of-0001.json.zip');
             $this->info('Then unzip it into storage/app/data/ndc/');
+
             return 1;
         }
 
@@ -63,22 +65,24 @@ class ImportFDANdcDrugData extends Command
         foreach ($records as $item) {
             $ndc = $item['product_ndc'] ?? null;
 
-            if (!$ndc) continue;
-            if(isset($item['generic_name']) && !empty($item['generic_name'])){
+            if (! $ndc) {
+                continue;
+            }
+            if (isset($item['generic_name']) && ! empty($item['generic_name'])) {
                 Drug::updateOrCreate(
                     ['ndc_code' => $ndc],
                     [
-                        'source_provider'   => 'openfda',
+                        'source_provider' => 'openfda',
                         'source_identifier' => $ndc,
-                        'ndc_code'          => $ndc,
-                        'generic_name'      => $item['generic_name'] ?? null,
-                        'brand_name'        => $item['brand_name'] ?? null,
-                        'display_name'      => $item['brand_name'] ?? $item['generic_name'] ?? null,
-                        'strength_text'     => $item['active_ingredients'][0]['strength'] ?? null,
-                        'dosage_form_text'  => $item['dosage_form'] ?? null,
-                        'raw_payload'       => $item,
-                        'is_cached_external'=> true,
-                        'is_active'         => true,
+                        'ndc_code' => $ndc,
+                        'generic_name' => $item['generic_name'] ?? null,
+                        'brand_name' => $item['brand_name'] ?? null,
+                        'display_name' => $item['brand_name'] ?? $item['generic_name'] ?? null,
+                        'strength_text' => $item['active_ingredients'][0]['strength'] ?? null,
+                        'dosage_form_text' => $item['dosage_form'] ?? null,
+                        'raw_payload' => $item,
+                        'is_cached_external' => true,
+                        'is_active' => true,
                     ]
                 );
             }

@@ -4,8 +4,8 @@ namespace Modules\Pharmacy\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Enums\ControlledSchedule;
+use Modules\Pharmacy\Enums\DosageForm;
 
 class MedicationRequest extends FormRequest
 {

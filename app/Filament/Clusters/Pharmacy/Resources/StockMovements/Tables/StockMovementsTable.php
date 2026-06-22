@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Context;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\StockMovementResource;
 use Modules\Pharmacy\Models\Medication;
 
 class StockMovementsTable
@@ -38,11 +39,11 @@ class StockMovementsTable
                     ->label('Delta')
                     ->sortable()
                     ->color(fn (int $state): string => $state >= 0 ? 'success' : 'danger')
-                    ->formatStateUsing(fn ($record): string => $record->delta . ' ' . ($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
+                    ->formatStateUsing(fn ($record): string => $record->delta.' '.($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
                 TextColumn::make('quantity_after')
                     ->label('After')
                     ->sortable()
-                    ->formatStateUsing(fn ($record): string => $record->quantity_after . ' ' . ($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
+                    ->formatStateUsing(fn ($record): string => $record->quantity_after.' '.($record->unit_label_snapshot ?? $record->medication?->stockUnit?->label ?? '')),
                 TextColumn::make('reason')
                     ->label('Reason')
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -79,8 +80,8 @@ class StockMovementsTable
                     Action::make('activities')
                         ->label('Activities')
                         ->icon('heroicon-o-bell-alert')
-                        ->url(fn ($record) => \Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\StockMovementResource::getUrl('activities', ['record' => $record])),
-                ])
+                        ->url(fn ($record) => StockMovementResource::getUrl('activities', ['record' => $record])),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

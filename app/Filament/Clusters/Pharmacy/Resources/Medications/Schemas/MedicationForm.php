@@ -7,7 +7,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\CoverageType;
@@ -76,19 +75,19 @@ class MedicationForm
                         'service',
                         'name',
                         fn ($query, $record) => $query
-                        ->where(function ($q) use ($record) {
-                            $q->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value));
-                            if ($record?->service_id) {
-                                $q->orWhere('id', $record->service_id);
-                            }
-                        })
+                            ->where(function ($q) use ($record) {
+                                $q->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value));
+                                if ($record?->service_id) {
+                                    $q->orWhere('id', $record->service_id);
+                                }
+                            })
                     )
                     ->searchable()
                     ->preload()
                     ->nullable()
                     ->live()
                     ->placeholder('Select or leave empty for auto-creation')
-                    ->afterStateUpdated(function ($state, Set $set){
+                    ->afterStateUpdated(function ($state, Set $set) {
                         $service = filled($state) ? Service::query()->find($state) : null;
 
                         if (! $service) {

@@ -13,6 +13,4 @@ class PharmacyCluster extends Cluster
     protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?string $navigationLabel = 'Pharmacy';
-
-
 }

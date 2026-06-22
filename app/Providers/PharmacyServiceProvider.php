@@ -2,6 +2,7 @@
 
 namespace Modules\Pharmacy\Providers;
 
+use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Pharmacy\Classes\Services\StockService;
 use Modules\Pharmacy\Console\BackfillMedicationBillingServicesCommand;
@@ -9,8 +10,6 @@ use Modules\Pharmacy\Console\BackfillMedicationUnitsCommand;
 use Modules\Pharmacy\Console\BackfillPrescriptionDetailsCommand;
 use Modules\Pharmacy\Console\ImportFDANdcDrugData;
 use Modules\Pharmacy\Models\Dispense;
-use Modules\Pharmacy\Models\Medication;
-use Modules\Pharmacy\Observers\MedicationObserver;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class PharmacyServiceProvider extends ModuleServiceProvider
@@ -35,8 +34,8 @@ class PharmacyServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        if (class_exists(\Modules\Clinical\Models\RequestItem::class)) {
-            \Modules\Clinical\Models\RequestItem::resolveRelationUsing('dispenses', function ($requestItem) {
+        if (class_exists(RequestItem::class)) {
+            RequestItem::resolveRelationUsing('dispenses', function ($requestItem) {
                 return $requestItem->hasMany(Dispense::class);
             });
         }
@@ -44,7 +43,7 @@ class PharmacyServiceProvider extends ModuleServiceProvider
         $this->registerCommands();
     }
 
-     /**
+    /**
      * Register commands in the format of Command::class
      */
     protected function registerCommands(): void

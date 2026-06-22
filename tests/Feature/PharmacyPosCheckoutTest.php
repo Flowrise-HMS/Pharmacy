@@ -7,8 +7,9 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Billing\Enums\InvoiceStatus;
 use Modules\Billing\Enums\PaymentMethod;
 use Modules\Core\Models\Branch;
+use Modules\Core\Models\Organization;
 use Modules\Core\Models\Service;
-use Modules\Core\Models\ServiceCategory;
+use Modules\Core\Support\AppSettings;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
 use Modules\Pharmacy\Exceptions\InsufficientStockException;
 use Modules\Pharmacy\Models\Medication;
@@ -378,7 +379,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        $organization = \Modules\Core\Models\Organization::factory()->create([
+        $organization = Organization::factory()->create([
             'pharmacy_pos_collect_payment' => true,
         ]);
 
@@ -407,7 +408,7 @@ class PharmacyPosCheckoutTest extends TestCase
             'quantity_on_hand' => 10,
         ]);
 
-        $settings = \Modules\Core\Support\AppSettings::forBranch($branch->id);
+        $settings = AppSettings::forBranch($branch->id);
         $this->assertFalse($settings->pharmacyPosCollectPaymentEnabled());
 
         $result = app(PharmacyPosCheckoutService::class)->checkoutChargeToAccount([

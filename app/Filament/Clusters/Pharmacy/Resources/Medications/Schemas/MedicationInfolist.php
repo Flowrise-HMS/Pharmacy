@@ -40,7 +40,8 @@ class MedicationInfolist
                             ->label('Total')
                             ->state(function (Medication $record) {
                                 $qty = $record->stockItems()->sum('quantity_on_hand');
-                                return $qty . ' ' . ($record->stockUnit?->label ?? '');
+
+                                return $qty.' '.($record->stockUnit?->label ?? '');
                             })
                             ->color(fn ($state) => $state > 0 ? 'success' : 'danger'),
                         RepeatableEntry::make('stockItems')
@@ -48,10 +49,10 @@ class MedicationInfolist
                                 TextEntry::make('branch.name')->label('Branch'),
                                 TextEntry::make('quantity_on_hand')
                                     ->label('Qty')
-                                    ->formatStateUsing(fn (StockItem $record): string => $record->quantity_on_hand . ' ' . ($record->medication?->stockUnit?->label ?? '')),
+                                    ->formatStateUsing(fn (StockItem $record): string => $record->quantity_on_hand.' '.($record->medication?->stockUnit?->label ?? '')),
                                 TextEntry::make('reorder_point')
                                     ->label('Reorder At')
-                                    ->formatStateUsing(fn (StockItem $record): string => $record->reorder_point . ' ' . ($record->medication?->stockUnit?->label ?? '')),
+                                    ->formatStateUsing(fn (StockItem $record): string => $record->reorder_point.' '.($record->medication?->stockUnit?->label ?? '')),
                             ])
                             ->columns(3),
                     ]),

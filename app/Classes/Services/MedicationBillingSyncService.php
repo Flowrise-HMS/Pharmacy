@@ -35,7 +35,7 @@ final class MedicationBillingSyncService
 
         while (Service::query()->where('slug', $slug)->exists()) {
             $counter++;
-            $slug = $baseSlug . '-' . $counter;
+            $slug = $baseSlug.'-'.$counter;
         }
 
         $service = Service::query()->create([
@@ -86,6 +86,7 @@ final class MedicationBillingSyncService
     {
         if ($medication->service) {
             $this->syncBilling($medication, $billingData);
+
             return $medication->fresh()->service;
         }
 
@@ -111,7 +112,7 @@ final class MedicationBillingSyncService
 
         while (Service::query()->where('slug', $slug)->exists()) {
             $counter++;
-            $slug = $baseSlug . '-' . $counter;
+            $slug = $baseSlug.'-'.$counter;
         }
 
         $service = Service::query()->create([

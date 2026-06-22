@@ -6,7 +6,6 @@ use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
@@ -14,8 +13,6 @@ use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Enums\FiltersLayout;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -23,11 +20,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Modules\Billing\Enums\PaymentMethod;
+use Modules\Billing\Filament\Clusters\Billing\Pages\BillingDesk;
+use Modules\Billing\Models\Payment;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
-use Modules\Core\Models\ServiceCategory;
+use Modules\Core\Settings\FeatureSettings;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
 use Modules\Pharmacy\Classes\Support\PharmacyPosTotals;
@@ -425,6 +424,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->color(function ($state): string {
                     $parts = explode(' ', (string) $state);
                     $qty = (int) ($parts[0] ?? 0);
+
                     return match (true) {
                         $qty > 10 => 'success',
                         $qty > 0 => 'warning',
@@ -738,7 +738,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
             $invoice = $result['invoice'];
 
-            $billingDeskUrl = \Modules\Billing\Filament\Clusters\Billing\Pages\BillingDesk::getUrl(['invoice' => $invoice->id]);
+            $billingDeskUrl = BillingDesk::getUrl(['invoice' => $invoice->id]);
 
             $this->lastInvoiceNumber = $invoice->invoice_number;
 
@@ -878,7 +878,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return false;
         }
 
-        return auth()->user()?->can('create', \Modules\Billing\Models\Payment::class) ?? false;
+        return auth()->user()?->can('create', Payment::class) ?? false;
     }
 
     /** @return array<int, string> */
@@ -900,7 +900,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
     public static function shouldRegisterNavigation(): bool
     {
         try {
-            return app(\Modules\Core\Settings\FeatureSettings::class)->pharmacy_pos_enabled;
+            return app(FeatureSettings::class)->pharmacy_pos_enabled;
         } catch (\Throwable) {
             return true;
         }

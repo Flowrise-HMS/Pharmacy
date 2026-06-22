@@ -15,7 +15,6 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Modules\Core\Classes\Services\BranchService;
-use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Models\Medication;
@@ -45,7 +44,8 @@ class MedicationsTable
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger')
                     ->formatStateUsing(function (Medication $record): string {
                         $qty = $record->stock_items_sum_quantity_on_hand ?? 0;
-                        return $qty . ' ' . ($record->stockUnit?->label ?? '');
+
+                        return $qty.' '.($record->stockUnit?->label ?? '');
                     }),
                 CurrencyColumn::make('service.price')
                     ->label('Cash price')
@@ -105,11 +105,11 @@ class MedicationsTable
                             ->body("{$data['quantity']} unit(s) added to {$record->displayName()}")
                             ->send();
                     }),
-               ActionGroup::make([
-                 ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
-               ])
+                ActionGroup::make([
+                    ViewAction::make(),
+                    EditAction::make(),
+                    DeleteAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

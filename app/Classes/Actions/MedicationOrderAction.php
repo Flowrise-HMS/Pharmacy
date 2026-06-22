@@ -14,9 +14,11 @@ use Filament\Schemas\Components\Fieldset;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Modules\Billing\Models\InvoiceLine;
+use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Models\Encounter;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Service;
+use Modules\Core\Models\Unit;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
@@ -147,7 +149,7 @@ class MedicationOrderAction
 
                                 Select::make('dose_unit_id')
                                     ->label('Dose Unit')
-                                    ->options(\Modules\Core\Models\Unit::pluck('label', 'id'))
+                                    ->options(Unit::pluck('label', 'id'))
                                     ->searchable()
                                     ->required()
                                     ->placeholder('e.g. ml, tablet'),
@@ -182,7 +184,7 @@ class MedicationOrderAction
                                         }
                                         $encounter = Encounter::find($encounterId);
 
-                                        return app(\Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy::class)
+                                        return app(MedicationFulfillmentPolicy::class)
                                             ->defaultAdministrationContext($encounter)
                                             ->value;
                                     })
@@ -263,13 +265,11 @@ class MedicationOrderAction
                         'guest_phone' => $data['guest_phone'] ?? '',
                     ], $data['items'], $user, null);
 
-
                     if ($request && $request->items->isNotEmpty()) {
                         $itemIds = $request->items?->pluck('id')?->toArray() ?? [];
                         $invoiceLines = InvoiceLine::where('billable_type', (new RequestItem)->getMorphClass())
                             ->whereIn('billable_id', $itemIds)
                             ->get();
-
 
                         if ($invoiceLines->isNotEmpty()) {
                             $lines = [];
@@ -301,8 +301,7 @@ class MedicationOrderAction
                         }
                     }
 
-
-                }catch (\Exception $e){
+                } catch (\Exception $e) {
                     Notification::make()
                         ->title('Order was not created')
                         ->danger()

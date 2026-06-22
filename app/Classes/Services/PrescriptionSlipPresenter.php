@@ -3,6 +3,7 @@
 namespace Modules\Pharmacy\Classes\Services;
 
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Pharmacy\Classes\Data\PrescriptionSlipLine;
@@ -23,7 +24,7 @@ class PrescriptionSlipPresenter
      *     lines: Collection<int, PrescriptionSlipLine>,
      *     patient: mixed,
      *     branch: mixed,
-     *     issuedAt: \Carbon\CarbonInterface,
+     *     issuedAt: CarbonInterface,
      *     pharmacist: User|null,
      *     sharedNotes: string|null,
      * }

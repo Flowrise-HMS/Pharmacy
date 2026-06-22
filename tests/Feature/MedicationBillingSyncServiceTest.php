@@ -4,7 +4,6 @@ namespace Modules\Pharmacy\Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Core\Models\Service;
-use Modules\Core\Models\ServiceCategory;
 use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
 use Modules\Pharmacy\Models\Medication;
 use Tests\TestCase;

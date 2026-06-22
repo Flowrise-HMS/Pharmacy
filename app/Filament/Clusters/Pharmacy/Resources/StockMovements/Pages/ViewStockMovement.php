@@ -18,7 +18,7 @@ class ViewStockMovement extends ViewRecord
             Action::make('activities')
                 ->label('Activities')
                 ->icon('heroicon-o-bell-alert')
-                ->url(fn () => \Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\StockMovementResource::getUrl('activities', ['record' => $this->getRecord()])),
+                ->url(fn () => StockMovementResource::getUrl('activities', ['record' => $this->getRecord()])),
         ];
     }
 }

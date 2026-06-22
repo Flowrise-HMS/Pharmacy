@@ -12,7 +12,7 @@ class PharmacyDatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            PharmacyShieldPermissionsSeeder::class
+            PharmacyShieldPermissionsSeeder::class,
         ]);
     }
 }

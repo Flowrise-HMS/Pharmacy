@@ -60,11 +60,11 @@ class StockMovement extends BaseModel
 
     public function getDeltaWithUnitAttribute(): string
     {
-        return $this->delta . ' ' . ($this->unit_label_snapshot ?? $this->medication?->stockUnit?->label ?? '');
+        return $this->delta.' '.($this->unit_label_snapshot ?? $this->medication?->stockUnit?->label ?? '');
     }
 
     public function getQuantityAfterWithUnitAttribute(): string
     {
-        return $this->quantity_after . ' ' . ($this->unit_label_snapshot ?? $this->medication?->stockUnit?->label ?? '');
+        return $this->quantity_after.' '.($this->unit_label_snapshot ?? $this->medication?->stockUnit?->label ?? '');
     }
 }

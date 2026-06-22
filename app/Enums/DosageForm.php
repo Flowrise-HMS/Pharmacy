@@ -6,6 +6,7 @@ use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasDescription;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
+
 enum DosageForm: string implements HasColor, HasDescription, HasLabel
 {
     case TABLET = 'tablet';
