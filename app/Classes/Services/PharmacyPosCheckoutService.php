@@ -95,7 +95,10 @@ class PharmacyPosCheckoutService
         if (! empty($svcRows)) {
             $svcIds = array_column($svcRows, 'id');
             $services = Service::query()
+                ->withoutGlobalScope('branch')
+                ->where('branch_id', $branchId)
                 ->whereIn('id', $svcIds)
+                ->fixed()
                 ->where('is_active', true)
                 ->where('is_billable', true)
                 ->get()
@@ -312,7 +315,10 @@ class PharmacyPosCheckoutService
         if (! empty($svcRows)) {
             $svcIds = array_column($svcRows, 'id');
             $services = Service::query()
+                ->withoutGlobalScope('branch')
+                ->where('branch_id', $branchId)
                 ->whereIn('id', $svcIds)
+                ->fixed()
                 ->where('is_active', true)
                 ->where('is_billable', true)
                 ->get()

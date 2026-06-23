@@ -249,11 +249,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
     protected function makeServicesTable(Table $table): Table
     {
         return $table
-            ->query(Service::query()
-                ->where('is_active', true)
-                ->where('is_billable', true)
-                ->whereHas('category', fn ($q) => $q->where('code', '!=', 'MED'))
-                ->with('category'))
+            ->query(fn () => $this->servicesTableQuery())
             ->defaultSort('name')
             ->paginationPageOptions([12, 24, 48])
             ->searchPlaceholder(__('Search services…'))
@@ -266,13 +262,35 @@ class PharmacyPos extends Page implements HasActions, HasTable
             })
             ->columns($this->viewMode === 'card' ? $this->getServiceCardColumns() : $this->getServiceTableColumns())
             ->contentGrid($this->viewMode === 'card' ? ['md' => 2, 'xl' => 3] : null)
-            ->emptyStateHeading(__('No services available'))
-            ->emptyStateDescription(__('No active billable services found.'))
+            ->emptyStateHeading(fn (): string => blank($this->selectedBranchId)
+                ? __('Select a branch')
+                : __('No services available for this branch'))
+            ->emptyStateDescription(fn (): string => blank($this->selectedBranchId)
+                ? __('Choose an active branch to browse services.')
+                : __('No active fixed-price services found for this branch.'))
             ->recordAction('add_service_to_cart')
-            ->actions([
+            ->recordActions([
                 Action::make('add_service_to_cart')
                     ->action(fn (Service $record) => $this->addServiceToCart($record->id)),
             ]);
+    }
+
+    protected function servicesTableQuery(): Builder
+    {
+        $query = Service::query()
+            ->withoutGlobalScope('branch')
+            ->fixed()
+            ->where('is_active', true)
+            ->where('is_billable', true)
+            ->whereHas('category', fn ($q) => $q->where('code', '!=', 'MED'));
+
+        if (blank($this->selectedBranchId)) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $query
+            ->where('branch_id', $this->selectedBranchId)
+            ->with('category');
     }
 
     protected function medicationsTableQuery(): Builder

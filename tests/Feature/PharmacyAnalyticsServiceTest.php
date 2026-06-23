@@ -55,6 +55,7 @@ class PharmacyAnalyticsServiceTest extends TestCase
 
         $posService = Service::factory()->create([
             'category_id' => $medCategory->id,
+            'branch_id' => $branch->id,
             'price' => 15.00,
             'is_active' => true,
             'is_billable' => true,
@@ -107,6 +108,7 @@ class PharmacyAnalyticsServiceTest extends TestCase
 
         $posService = Service::factory()->create([
             'category_id' => $category->id,
+            'branch_id' => $branch->id,
             'price' => 5.00,
             'is_active' => true,
             'is_billable' => true,
@@ -223,6 +225,7 @@ class PharmacyAnalyticsServiceTest extends TestCase
 
         $cheapService = Service::factory()->create([
             'category_id' => $category->id,
+            'branch_id' => $branch->id,
             'price' => 5.00,
             'is_active' => true,
             'is_billable' => true,
@@ -230,6 +233,7 @@ class PharmacyAnalyticsServiceTest extends TestCase
 
         $expensiveService = Service::factory()->create([
             'category_id' => $category->id,
+            'branch_id' => $branch->id,
             'price' => 50.00,
             'is_active' => true,
             'is_billable' => true,
@@ -356,6 +360,7 @@ class PharmacyAnalyticsServiceTest extends TestCase
         $medService = Service::factory()->create(['category_id' => $category->id, 'price' => 20.00, 'is_active' => true]);
         $posService = Service::factory()->create([
             'category_id' => $category->id,
+            'branch_id' => $branch->id,
             'price' => 8.00,
             'is_active' => true,
             'is_billable' => true,

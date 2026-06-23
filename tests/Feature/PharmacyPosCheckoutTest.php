@@ -9,6 +9,7 @@ use Modules\Billing\Enums\PaymentMethod;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Organization;
 use Modules\Core\Models\Service;
+use Modules\Core\Models\ServiceCategory;
 use Modules\Core\Support\AppSettings;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
 use Modules\Pharmacy\Exceptions\InsufficientStockException;
@@ -430,6 +431,185 @@ class PharmacyPosCheckoutTest extends TestCase
             'branch_id' => $branch->id,
             'medication_id' => $medication->id,
             'quantity_on_hand' => 8,
+        ]);
+    }
+
+    public function test_service_checkout_processes_fixed_service_from_correct_branch(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $branch = Branch::factory()->create(['is_active' => true]);
+        $category = ServiceCategory::factory()->create(['code' => 'CON']);
+
+        $service = Service::factory()->create([
+            'category_id' => $category->id,
+            'branch_id' => $branch->id,
+            'billing_type' => \Modules\Core\Enums\BillingType::FIXED,
+            'price' => 50.00,
+            'is_active' => true,
+            'is_billable' => true,
+        ]);
+
+        $result = app(PharmacyPosCheckoutService::class)->checkout([
+            'branch_id' => $branch->id,
+            'patient_id' => null,
+            'guest_name' => 'Service Customer',
+            'guest_phone' => '233501234567',
+            'currency' => 'GHS',
+            'payment_method' => PaymentMethod::Cash,
+            'amount_tendered' => 50.00,
+            'cart' => [
+                ['type' => 'service', 'id' => $service->id, 'quantity' => 1],
+            ],
+        ]);
+
+        $this->assertNotNull($result['invoice']->id);
+        $this->assertNotNull($result['payment']);
+        $this->assertCount(1, $result['invoice']->lines);
+        $this->assertSame('50.00', $result['invoice']->lines->first()->unit_price);
+    }
+
+    public function test_service_checkout_rejects_time_based_service(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $branch = Branch::factory()->create(['is_active' => true]);
+        $category = ServiceCategory::factory()->create(['code' => 'CON']);
+
+        $service = Service::factory()->timeBased()->create([
+            'category_id' => $category->id,
+            'branch_id' => $branch->id,
+            'price' => 0,
+            'time_rate_per_minute' => 2.50,
+            'is_active' => true,
+            'is_billable' => true,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Service {$service->id} not found or inactive.");
+
+        app(PharmacyPosCheckoutService::class)->checkout([
+            'branch_id' => $branch->id,
+            'patient_id' => null,
+            'guest_name' => 'Service Customer',
+            'guest_phone' => '233501234567',
+            'currency' => 'GHS',
+            'payment_method' => PaymentMethod::Cash,
+            'amount_tendered' => 50.00,
+            'cart' => [
+                ['type' => 'service', 'id' => $service->id, 'quantity' => 1],
+            ],
+        ]);
+    }
+
+    public function test_service_checkout_rejects_wrong_branch_service(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $branchA = Branch::factory()->create(['is_active' => true]);
+        $branchB = Branch::factory()->create(['is_active' => true]);
+        $category = ServiceCategory::factory()->create(['code' => 'CON']);
+
+        $service = Service::factory()->create([
+            'category_id' => $category->id,
+            'branch_id' => $branchB->id,
+            'price' => 50.00,
+            'is_active' => true,
+            'is_billable' => true,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Service {$service->id} not found or inactive.");
+
+        app(PharmacyPosCheckoutService::class)->checkout([
+            'branch_id' => $branchA->id,
+            'patient_id' => null,
+            'guest_name' => 'Service Customer',
+            'guest_phone' => '233501234567',
+            'currency' => 'GHS',
+            'payment_method' => PaymentMethod::Cash,
+            'amount_tendered' => 50.00,
+            'cart' => [
+                ['type' => 'service', 'id' => $service->id, 'quantity' => 1],
+            ],
+        ]);
+    }
+
+    public function test_charge_to_account_rejects_time_based_service(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $organization = Organization::factory()->create();
+        $branch = Branch::factory()->create([
+            'organization_id' => $organization->id,
+            'is_active' => true,
+        ]);
+        $category = ServiceCategory::factory()->create(['code' => 'CON']);
+
+        $service = Service::factory()->timeBased()->create([
+            'category_id' => $category->id,
+            'branch_id' => $branch->id,
+            'price' => 0,
+            'time_rate_per_minute' => 2.50,
+            'is_active' => true,
+            'is_billable' => true,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Service {$service->id} not found or inactive.");
+
+        app(PharmacyPosCheckoutService::class)->checkoutChargeToAccount([
+            'branch_id' => $branch->id,
+            'patient_id' => null,
+            'guest_name' => 'Service Customer',
+            'guest_phone' => '233501234567',
+            'currency' => 'GHS',
+            'cart' => [
+                ['type' => 'service', 'id' => $service->id, 'quantity' => 1],
+            ],
+        ]);
+    }
+
+    public function test_charge_to_account_rejects_wrong_branch_service(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $organization = Organization::factory()->create();
+        $branchA = Branch::factory()->create([
+            'organization_id' => $organization->id,
+            'is_active' => true,
+        ]);
+        $branchB = Branch::factory()->create([
+            'organization_id' => $organization->id,
+            'is_active' => true,
+        ]);
+        $category = ServiceCategory::factory()->create(['code' => 'CON']);
+
+        $service = Service::factory()->create([
+            'category_id' => $category->id,
+            'branch_id' => $branchB->id,
+            'price' => 50.00,
+            'is_active' => true,
+            'is_billable' => true,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Service {$service->id} not found or inactive.");
+
+        app(PharmacyPosCheckoutService::class)->checkoutChargeToAccount([
+            'branch_id' => $branchA->id,
+            'patient_id' => null,
+            'guest_name' => 'Service Customer',
+            'guest_phone' => '233501234567',
+            'currency' => 'GHS',
+            'cart' => [
+                ['type' => 'service', 'id' => $service->id, 'quantity' => 1],
+            ],
         ]);
     }
 }
