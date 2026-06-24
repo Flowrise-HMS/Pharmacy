@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Billing\Enums\InvoiceStatus;
 use Modules\Billing\Enums\PaymentMethod;
+use Modules\Core\Enums\BillingType;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Organization;
 use Modules\Core\Models\Service;
@@ -445,7 +446,7 @@ class PharmacyPosCheckoutTest extends TestCase
         $service = Service::factory()->create([
             'category_id' => $category->id,
             'branch_id' => $branch->id,
-            'billing_type' => \Modules\Core\Enums\BillingType::FIXED,
+            'billing_type' => BillingType::FIXED,
             'price' => 50.00,
             'is_active' => true,
             'is_billable' => true,
