@@ -373,6 +373,7 @@ class PharmacyPosPrescriptionTest extends TestCase
             $service = Service::factory()->create([
                 'category_id' => $category->id,
                 'name' => 'External Rx Med '.($i + 1),
+                'requires_payment_before' => false,
             ]);
 
             $request = ServiceRequest::factory()
