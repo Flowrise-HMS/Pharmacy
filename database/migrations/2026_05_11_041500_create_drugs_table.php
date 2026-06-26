@@ -31,7 +31,7 @@ return new class extends Migration
             $table->unique(['source_provider', 'source_identifier']);
             $table->index('rxnorm_code');
             $table->index('ndc_code');
-            $table->index('generic_name');
+            $table->fullText('generic_name');
         });
     }
 
