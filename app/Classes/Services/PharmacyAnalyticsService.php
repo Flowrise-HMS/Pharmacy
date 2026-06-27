@@ -529,12 +529,12 @@ class PharmacyAnalyticsService
             ->limit($limit)
             ->get()
             ->map(function (Dispense $dispense): array {
-                $patient = $dispense->requestItem?->serviceRequest?->patient;
+                $serviceRequest = $dispense->requestItem?->serviceRequest;
 
                 return [
                     'id' => (string) $dispense->id,
                     'dispensed_at' => $dispense->dispensed_at?->toIso8601String() ?? '',
-                    'patient' => $patient?->full_name ?? '—',
+                    'patient' => $serviceRequest?->clientIdentity()->name ?? '—',
                     'medication' => $dispense->medication?->displayName() ?? __('Unknown'),
                     'quantity' => (int) $dispense->quantity,
                     'pharmacist' => $dispense->dispensedBy?->name ?? '—',
@@ -574,9 +574,7 @@ class PharmacyAnalyticsService
             ->get()
             ->map(function (InvoiceLine $line): array {
                 $invoice = $line->invoice;
-                $customer = $invoice?->patient?->full_name
-                    ?? $invoice?->guest_name
-                    ?? '—';
+                $customer = $invoice?->clientIdentity()->name ?? '—';
 
                 $isService = $line->billable_type === null
                     && ($line->metadata['item_type'] ?? null) === 'service';
@@ -619,12 +617,12 @@ class PharmacyAnalyticsService
             ->limit($limit)
             ->get()
             ->map(function (Dispense $dispense): array {
-                $patient = $dispense->requestItem?->serviceRequest?->patient;
+                $serviceRequest = $dispense->requestItem?->serviceRequest;
 
                 return [
                     'id' => (string) $dispense->id,
                     'dispensed_at' => $dispense->dispensed_at?->toIso8601String() ?? '',
-                    'patient' => $patient?->full_name ?? '—',
+                    'patient' => $serviceRequest?->clientIdentity()->name ?? '—',
                     'medication' => $dispense->medication?->displayName() ?? __('Unknown'),
                     'quantity' => (int) $dispense->quantity,
                     'pharmacist' => $dispense->dispensedBy?->name ?? '—',

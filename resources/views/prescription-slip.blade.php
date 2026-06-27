@@ -92,11 +92,17 @@
 
         <hr class="sep">
 
-        <div class="line"><span class="bold">{{ __('Patient') }}:</span> {{ $patient?->full_name ?? '—' }}</div>
-        @if($patient?->mrn)
-            <div class="line meta">{{ __('MRN') }}: {{ $patient->mrn }}</div>
+        <div class="line"><span class="bold">{{ __('Client') }}:</span> {{ $client->name }}</div>
+        @if($client->identifier)
+            <div class="line meta">{{ $client->identifierLabel ?? __('Identifier') }}: {{ $client->identifier }}</div>
         @endif
-        @if($patient?->date_of_birth)
+        @if($client->phone && $client->isGuest())
+            <div class="line meta">{{ __('Phone') }}: {{ $client->phone }}</div>
+        @endif
+        @if($client->email && $client->isGuest())
+            <div class="line meta">{{ __('Email') }}: {{ $client->email }}</div>
+        @endif
+        @if($client->isPatient() && $patient?->date_of_birth)
             <div class="line meta">
                 {{ __('DOB') }}: {{ $patient->date_of_birth->format('Y-m-d') }}
                 @if($patient->age !== null)

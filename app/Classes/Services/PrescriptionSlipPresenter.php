@@ -119,6 +119,7 @@ class PrescriptionSlipPresenter
         return [
             'lines' => $lines,
             'patient' => $firstRequest->patient,
+            'client' => $firstRequest->clientIdentity(),
             'branch' => $firstRequest->branch,
             'issuedAt' => $issuedAt,
             'pharmacist' => $pharmacist,
