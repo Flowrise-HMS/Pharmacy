@@ -23,6 +23,7 @@ use Modules\Billing\Enums\PaymentMethod;
 use Modules\Billing\Filament\Clusters\Billing\Pages\BillingDesk;
 use Modules\Billing\Models\Payment;
 use Modules\Core\Classes\Services\BranchService;
+use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
@@ -282,7 +283,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
             ->fixed()
             ->where('is_active', true)
             ->where('is_billable', true)
-            ->whereHas('category', fn ($q) => $q->where('code', '!=', 'MED'));
+            ->whereHas('category', fn ($q) => $q?->where('code', '!=', ServiceCategoryCode::MED->value));
 
         if (blank($this->selectedBranchId)) {
             return $query->whereRaw('0 = 1');
