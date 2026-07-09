@@ -59,7 +59,25 @@ class StockService implements StockProviderContract
 
     public function increment(string $branchId, string $itemId, int $quantity, ?string $reason = null): void
     {
-        DB::transaction(function () use ($branchId, $itemId, $quantity, $reason): void {
+        $this->incrementWithReference(
+            branchId: $branchId,
+            itemId: $itemId,
+            quantity: $quantity,
+            reason: $reason,
+            referenceType: null,
+            referenceId: null,
+        );
+    }
+
+    public function incrementWithReference(
+        string $branchId,
+        string $itemId,
+        int $quantity,
+        ?string $reason = null,
+        ?string $referenceType = null,
+        ?string $referenceId = null,
+    ): void {
+        DB::transaction(function () use ($branchId, $itemId, $quantity, $reason, $referenceType, $referenceId): void {
             $stock = StockItem::query()->firstOrCreate(
                 ['branch_id' => $branchId, 'medication_id' => $itemId],
                 ['quantity_on_hand' => 0, 'reorder_point' => 0]
@@ -86,6 +104,8 @@ class StockService implements StockProviderContract
                 delta: $quantity,
                 quantityAfter: $qtyAfter,
                 reason: $reason,
+                referenceType: $referenceType,
+                referenceId: $referenceId,
             );
         });
     }
@@ -96,6 +116,8 @@ class StockService implements StockProviderContract
         int $delta,
         int $quantityAfter,
         ?string $reason,
+        ?string $referenceType = null,
+        ?string $referenceId = null,
     ): void {
         if (! DB::getSchemaBuilder()->hasTable('stock_movements')) {
             return;
@@ -121,8 +143,8 @@ class StockService implements StockProviderContract
             'quantity_after' => $quantityAfter,
             'unit_label_snapshot' => $unitLabel,
             'reason' => $reason,
-            'reference_type' => null,
-            'reference_id' => null,
+            'reference_type' => $referenceType,
+            'reference_id' => $referenceId,
             'performed_by' => Auth::id(),
             'created_at' => now(),
             'updated_at' => now(),
