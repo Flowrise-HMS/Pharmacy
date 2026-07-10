@@ -11,12 +11,15 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Modules\Core\Contracts\PharmacyStockItemTableActionsContract;
 use Modules\Pharmacy\Models\Medication;
 
 class StockItemsTable
 {
     public static function configure(Table $table): Table
     {
+        $optionalActions = app(PharmacyStockItemTableActionsContract::class)->recordActions();
+
         return $table
             ->columns([
                 TextColumn::make('#')->rowIndex(),
@@ -32,6 +35,7 @@ class StockItemsTable
                 TextColumn::make('updated_at')->dateTime()->sortable(),
             ])
             ->recordActions([
+                ...$optionalActions,
                 ActionGroup::make([
                     ViewAction::make(),
                     EditAction::make(),

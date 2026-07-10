@@ -2,13 +2,17 @@
 
 namespace Modules\Pharmacy\Filament\Widgets;
 
+use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseTableWidget;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
+use Modules\Core\Classes\Services\StockOverviewService;
 use Modules\Core\Filament\Concerns\InteractsWithWidgetShield;
-use Modules\Pharmacy\Models\StockItem;
+use Modules\Core\Support\ModuleAvailability;
+use Modules\Inventory\Filament\Clusters\Inventory\Resources\StockBalances\StockBalanceResource;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockItems\StockItemResource;
 
 class PharmacyLowStockTableWidget extends BaseTableWidget
 {
@@ -18,39 +22,53 @@ class PharmacyLowStockTableWidget extends BaseTableWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected static ?string $heading = 'Pharmacy low stock';
+    protected static ?string $heading = 'Low stock overview';
 
-    protected function getTableQuery(): Builder
+    public function table(Table $table): Table
     {
-        return StockItem::query()
-            ->with(['medication.service', 'branch'])
-            ->whereColumn('quantity_on_hand', '<=', 'reorder_point')
-            ->when($this->resolveBranchId(), fn (Builder $query, string $branchId) => $query->where('branch_id', $branchId))
-            ->orderBy('quantity_on_hand')
-            ->limit(10);
-    }
-
-    protected function getTableColumns(): array
-    {
-        return [
-            TextColumn::make('medication.service.name')
-                ->label(__('Medication'))
-                ->placeholder('—'),
-            TextColumn::make('branch.name')
-                ->label(__('Branch'))
-                ->placeholder('—'),
-            TextColumn::make('quantity_on_hand')
-                ->label(__('On hand'))
-                ->numeric(),
-            TextColumn::make('reorder_point')
-                ->label(__('Reorder point'))
-                ->numeric(),
-        ];
-    }
-
-    protected function isTablePaginationEnabled(): bool
-    {
-        return false;
+        return $table
+            ->records(fn (): array => app(StockOverviewService::class)->allLowStock(
+                branchId: $this->resolveBranchId(),
+                limitPerSource: 10,
+            ))
+            ->columns([
+                TextColumn::make('source')
+                    ->label(__('Source'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'inventory' => __('Central store'),
+                        default => __('Pharmacy'),
+                    })
+                    ->color(fn (string $state): string => $state === 'inventory' ? 'info' : 'warning'),
+                TextColumn::make('name')
+                    ->label(__('Item')),
+                TextColumn::make('branch')
+                    ->label(__('Branch')),
+                TextColumn::make('location')
+                    ->label(__('Location'))
+                    ->placeholder('—')
+                    ->visible(fn (): bool => ModuleAvailability::inventoryEnabled()),
+                TextColumn::make('quantity_on_hand')
+                    ->label(__('On hand'))
+                    ->numeric(),
+                TextColumn::make('reorder_point')
+                    ->label(__('Reorder point'))
+                    ->numeric(),
+            ])
+            ->paginated(false)
+            ->emptyStateHeading(__('No low stock items'))
+            ->headerActions([
+                Action::make('view_pharmacy_stock')
+                    ->label(__('Pharmacy stock'))
+                    ->icon('heroicon-m-beaker')
+                    ->url(StockItemResource::getUrl('index')),
+                Action::make('view_central_store')
+                    ->label(__('Central store'))
+                    ->icon('heroicon-m-archive-box')
+                    ->visible(fn (): bool => ModuleAvailability::inventoryEnabled()
+                        && class_exists(StockBalanceResource::class))
+                    ->url(fn (): string => StockBalanceResource::getUrl('index')),
+            ]);
     }
 
     protected function resolveBranchId(): ?string

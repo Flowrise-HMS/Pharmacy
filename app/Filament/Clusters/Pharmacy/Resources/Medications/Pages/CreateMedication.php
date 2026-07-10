@@ -3,48 +3,53 @@
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Pages;
 
 use Filament\Resources\Pages\CreateRecord;
-use Illuminate\Support\Arr;
-use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
+use Modules\Pharmacy\Classes\Services\MedicationService;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\MedicationResource;
+use Modules\Pharmacy\Models\Drug;
+use Modules\Pharmacy\Models\Medication;
 
 class CreateMedication extends CreateRecord
 {
     protected static string $resource = MedicationResource::class;
 
-    private array $billingFormData = [];
+    /**
+     * @var array<string, mixed>
+     */
+    private array $formPayload = [];
 
-    private array $stockData = [];
-
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['insurance_price'] ??= 0;
-        $data['is_insurance_covered'] ??= false;
-        $data['coverage_type'] ??= 'none';
+        $this->formPayload = app(MedicationService::class)->normalizeBillingDefaults($data);
 
-        $this->billingFormData = Arr::only($data, [
-            'price', 'insurance_price', 'is_insurance_covered', 'coverage_type',
-        ]);
+        return app(MedicationService::class)->extractMedicationAttributes($this->formPayload);
+    }
 
-        $this->stockData = Arr::only($data, [
-            'stock_branch_id', 'initial_quantity',
-        ]);
+    protected function handleRecordCreation(array $data): Medication
+    {
+        $service = app(MedicationService::class);
+        $payload = $this->formPayload;
 
-        return Arr::except($data, [
-            'price', 'insurance_price', 'is_insurance_covered', 'coverage_type',
-            'stock_branch_id', 'initial_quantity',
-        ]);
+        if (filled($payload['drug_id'] ?? null) && blank($payload['service_id'] ?? null)) {
+            $drug = Drug::query()->find($payload['drug_id']);
+
+            if ($drug) {
+                return $service->createFromDrug($drug, $payload);
+            }
+        }
+
+        if (blank($payload['service_id'] ?? null)) {
+            return $service->createWithService($payload);
+        }
+
+        return Medication::query()->create($service->extractMedicationAttributes($payload));
     }
 
     protected function afterCreate(): void
     {
-        app(MedicationBillingSyncService::class)
-            ->ensureBillingService($this->record, $this->billingFormData);
-
-        if (filled($this->stockData['stock_branch_id'] ?? null) && ($this->stockData['initial_quantity'] ?? 0) > 0) {
-            $this->record->stockItems()->create([
-                'branch_id' => $this->stockData['stock_branch_id'],
-                'quantity_on_hand' => (int) $this->stockData['initial_quantity'],
-            ]);
-        }
+        app(MedicationService::class)->completeCreate($this->record, $this->formPayload);
     }
 }

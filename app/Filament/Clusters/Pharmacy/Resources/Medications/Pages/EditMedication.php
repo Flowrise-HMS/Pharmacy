@@ -3,47 +3,43 @@
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Pages;
 
 use Filament\Resources\Pages\EditRecord;
-use Illuminate\Support\Arr;
-use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
+use Modules\Pharmacy\Classes\Services\MedicationService;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\MedicationResource;
 
 class EditMedication extends EditRecord
 {
     protected static string $resource = MedicationResource::class;
 
-    private array $billingFormData = [];
+    /**
+     * @var array<string, mixed>
+     */
+    private array $formPayload = [];
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $service = $this->record->service;
-
-        if ($service) {
-            $data['price'] = $service->price;
-            $data['insurance_price'] = $service->insurance_price;
-            $data['is_insurance_covered'] = $service->is_insurance_covered;
-            $data['coverage_type'] = $service->coverage_type?->value ?? 'none';
-        }
-
-        return $data;
+        return array_merge(
+            $data,
+            app(MedicationService::class)->billingAttributesFromService($this->record->service),
+        );
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['insurance_price'] ??= $this->record->service?->insurance_price ?? 0;
-        $data['is_insurance_covered'] ??= $this->record->service?->is_insurance_covered ?? false;
-        $data['coverage_type'] ??= $this->record->service?->coverage_type?->value ?? 'none';
+        $this->formPayload = app(MedicationService::class)->normalizeBillingDefaults($data);
 
-        $this->billingFormData = Arr::only($data, [
-            'price', 'insurance_price', 'is_insurance_covered', 'coverage_type',
-        ]);
-
-        return Arr::except($data, [
-            'price', 'insurance_price', 'is_insurance_covered', 'coverage_type',
-        ]);
+        return app(MedicationService::class)->extractMedicationAttributes($this->formPayload);
     }
 
     protected function afterSave(): void
     {
-        app(MedicationBillingSyncService::class)->ensureBillingService($this->record, $this->billingFormData);
+        app(MedicationService::class)->completeUpdate($this->record, $this->formPayload);
     }
 }

@@ -3,8 +3,10 @@
 namespace Modules\Pharmacy\Providers;
 
 use Modules\Clinical\Models\RequestItem;
+use Modules\Core\Contracts\PharmacyLowStockProviderContract;
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Pharmacy\Classes\Services\StockService;
+use Modules\Pharmacy\Classes\Support\PharmacyLowStockProvider;
 use Modules\Pharmacy\Console\BackfillMedicationBillingServicesCommand;
 use Modules\Pharmacy\Console\BackfillMedicationUnitsCommand;
 use Modules\Pharmacy\Console\BackfillPrescriptionDetailsCommand;
@@ -28,6 +30,7 @@ class PharmacyServiceProvider extends ModuleServiceProvider
         parent::register();
 
         $this->app->bind(StockProviderContract::class, StockService::class);
+        $this->app->bind(PharmacyLowStockProviderContract::class, PharmacyLowStockProvider::class);
     }
 
     public function boot(): void

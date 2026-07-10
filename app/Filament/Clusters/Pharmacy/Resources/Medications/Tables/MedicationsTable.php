@@ -9,14 +9,11 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
-use Modules\Core\Models\Branch;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Schemas\MedicationForm;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
 
@@ -72,21 +69,7 @@ class MedicationsTable
                     ->visible(fn () => auth()->user()?->can('create', StockItem::class))
                     ->modalHeading('Add Stock')
                     ->modalDescription(fn (Medication $record) => "Add stock to {$record->displayName()}")
-                    ->schema([
-                        Select::make('branch_id')
-                            ->label('Branch')
-                            ->required()
-                            ->searchable()
-                            ->options(fn () => Branch::query()?->active()?->orderBy('name')?->pluck('name', 'id')->toArray())
-                            ->preload()
-                            ->default(app(BranchService::class)->getDefaultBranchId()),
-                        TextInput::make('quantity')
-                            ->label('Quantity')
-                            ->required()
-                            ->numeric()
-                            ->minValue(1)
-                            ->default(1),
-                    ])
+                    ->schema(MedicationForm::addStockFields())
                     ->action(function (Medication $record, array $data): void {
                         StockItem::firstOrCreate(
                             [
