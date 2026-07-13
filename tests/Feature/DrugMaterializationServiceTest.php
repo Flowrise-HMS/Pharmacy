@@ -35,8 +35,6 @@ class DrugMaterializationServiceTest extends TestCase
         $medication = app(DrugMaterializationService::class)->materialize($drug, [
             'service_name' => 'Amoxicillin 500 MG Oral Capsule',
             'price' => 12.50,
-            'insurance_price' => 10.00,
-            'is_insurance_covered' => true,
             'requires_prescription' => true,
             'branch_id' => $branch->id,
             'initial_stock_quantity' => 25,
@@ -50,8 +48,6 @@ class DrugMaterializationServiceTest extends TestCase
             'id' => $service->id,
             'name' => 'Amoxil 500 MG',
             'price' => '12.50',
-            'insurance_price' => '10.00',
-            'is_insurance_covered' => 1,
             'requires_prescription' => 1,
         ]);
         $this->assertDatabaseHas('medications', [

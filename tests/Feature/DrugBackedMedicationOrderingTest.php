@@ -37,8 +37,6 @@ class DrugBackedMedicationOrderingTest extends TestCase
         $medication = app(DrugMaterializationService::class)->materialize($drug, [
             'service_name' => 'Ibuprofen 200 MG Tablet',
             'price' => 5,
-            'insurance_price' => 4,
-            'is_insurance_covered' => true,
             'requires_prescription' => false,
             'branch_id' => $branch->id,
             'initial_stock_quantity' => 15,

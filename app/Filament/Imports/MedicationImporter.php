@@ -25,17 +25,9 @@ class MedicationImporter extends Importer
             ImportColumn::make('price')
                 ->numeric()
                 ->rules(['numeric', 'min:0']),
-            ImportColumn::make('insurance_price')
-                ->numeric()
-                ->rules(['numeric', 'min:0']),
-            ImportColumn::make('is_insurance_covered')
-                ->boolean()
-                ->rules(['boolean']),
             ImportColumn::make('requires_prescription')
                 ->boolean()
                 ->rules(['boolean']),
-            ImportColumn::make('coverage_type')
-                ->rules(['max:50']),
             ImportColumn::make('initial_stock_quantity')
                 ->numeric()
                 ->rules(['integer', 'min:0']),

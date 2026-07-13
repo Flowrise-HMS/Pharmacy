@@ -11,11 +11,9 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Modules\Core\Classes\Services\BranchService;
-use Modules\Core\Enums\CoverageType;
 use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
-use Modules\Core\Settings\FeatureSettings;
 use Modules\Core\Support\Currency;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationService;
@@ -33,7 +31,7 @@ class MedicationForm
                     ->description(__('Link a drug reference or enter medication details manually.'))
                     ->schema(self::identityFields()),
                 Section::make(__('Billing'))
-                    ->description(__('Cash and insurance pricing for the linked billing service.'))
+                    ->description(__('Cash pricing for the linked billing service.'))
                     ->schema(self::pricingFields()),
                 Section::make(__('Units & packaging'))
                     ->schema(self::unitFields()),
@@ -125,9 +123,6 @@ class MedicationForm
                     }
 
                     $set('price', $service->price);
-                    $set('insurance_price', $service->insurance_price);
-                    $set('coverage_type', $service->coverage_type?->value ?? CoverageType::NONE->value);
-                    $set('is_insurance_covered', (bool) $service->is_insurance_covered);
                 }),
             Grid::make(2)
                 ->schema([
@@ -188,22 +183,6 @@ class MedicationForm
                         ->minValue(0)
                         ->prefix(Currency::defaultSymbol())
                         ->placeholder('0.00'),
-                    TextInput::make('insurance_price')
-                        ->label(__('Insurance price'))
-                        ->numeric()
-                        ->minValue(0)
-                        ->prefix(Currency::defaultSymbol())
-                        ->placeholder('0.00')
-                        ->visible(fn (): bool => self::insuranceEnabled()),
-                    Toggle::make('is_insurance_covered')
-                        ->label(__('Insurance covered'))
-                        ->default(false)
-                        ->visible(fn (): bool => self::insuranceEnabled()),
-                    Select::make('coverage_type')
-                        ->label(__('Coverage type'))
-                        ->options(CoverageType::class)
-                        ->default(CoverageType::NONE)
-                        ->visible(fn (): bool => self::insuranceEnabled()),
                 ]),
         ];
     }
@@ -289,14 +268,5 @@ class MedicationForm
                 // ->minValue(1)
                 ->default(1),
         ];
-    }
-
-    protected static function insuranceEnabled(): bool
-    {
-        try {
-            return app(FeatureSettings::class)->insurance_enabled;
-        } catch (\Throwable) {
-            return true;
-        }
     }
 }

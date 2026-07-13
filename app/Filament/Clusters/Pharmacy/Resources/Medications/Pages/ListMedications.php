@@ -52,7 +52,6 @@ class ListMedications extends ListRecords
                             }
 
                             $set('service_name', $drug->display_name);
-                            $set('insurance_price', 0);
                             $set('price', 0);
                         }),
                     TextInput::make('service_name')
@@ -63,15 +62,6 @@ class ListMedications extends ListRecords
                         ->required()
                         ->minValue(0)
                         ->default(0),
-                    TextInput::make('insurance_price')
-                        ->numeric()
-                        ->required()
-                        ->minValue(0)
-                        ->default(0),
-                    Select::make('is_insurance_covered')
-                        ->boolean()
-                        ->required()
-                        ->default(false),
                     Select::make('requires_prescription')
                         ->boolean()
                         ->required()

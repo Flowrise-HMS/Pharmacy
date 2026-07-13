@@ -59,8 +59,6 @@ class MedicationInfolist
                 Section::make('Pricing')
                     ->schema([
                         CurrencyEntry::make('service.price')->label('Cash price'),
-                        CurrencyEntry::make('service.insurance_price')->label('Insurance price'),
-                        TextEntry::make('service.is_insurance_covered')->label('Insurance covered')->badge()->formatStateUsing(fn ($state) => $state ? 'Yes' : 'No'),
                     ])
                     ->visible(fn (Medication $record) => $record->billingService() !== null),
                 TextEntry::make('created_at')->dateTime(),

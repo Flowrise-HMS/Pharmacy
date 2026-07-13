@@ -34,9 +34,6 @@ class MedicationBillingSyncServiceTest extends TestCase
             ],
             [
                 'price' => 10.00,
-                'insurance_price' => 8.00,
-                'is_insurance_covered' => true,
-                'coverage_type' => 'nhis',
             ]
         );
 
@@ -50,16 +47,13 @@ class MedicationBillingSyncServiceTest extends TestCase
         $this->assertNotNull($service);
         $this->assertSame('Tylenol 500mg', $service->name);
         $this->assertEquals(10.00, (float) $service->price);
-        $this->assertEquals(8.00, (float) $service->insurance_price);
-        $this->assertTrue((bool) $service->is_insurance_covered);
-        $this->assertSame('nhis', $service->coverage_type?->value);
     }
 
     public function test_sync_updates_existing_service_prices(): void
     {
         $medication = $this->syncService->createMedicationWithBilling(
             ['generic_name' => 'Amoxicillin', 'dosage_form' => 'capsule', 'is_active' => true],
-            ['price' => 15.00, 'insurance_price' => 12.00]
+            ['price' => 15.00]
         );
 
         $medication->load('service');
@@ -67,15 +61,13 @@ class MedicationBillingSyncServiceTest extends TestCase
 
         $this->syncService->syncBilling($medication, [
             'price' => 20.00,
-            'insurance_price' => 18.00,
         ]);
 
         $service = Service::find($serviceId);
         $this->assertEquals(20.00, (float) $service->price);
-        $this->assertEquals(18.00, (float) $service->insurance_price);
     }
 
-    public function test_insurance_price_defaults_to_cash_price(): void
+    public function test_price_is_set_on_service_when_only_price_provided(): void
     {
         $medication = $this->syncService->createMedicationWithBilling(
             ['generic_name' => 'Ibuprofen', 'dosage_form' => 'tablet', 'is_active' => true],
@@ -83,7 +75,7 @@ class MedicationBillingSyncServiceTest extends TestCase
         );
 
         $service = $medication->service;
-        $this->assertEquals(5.00, (float) $service->insurance_price);
+        $this->assertEquals(5.00, (float) $service->price);
     }
 
     public function test_inactive_medication_syncs_inactive_service(): void

@@ -19,9 +19,6 @@ class MedicationService
     {
         return [
             'price',
-            'insurance_price',
-            'is_insurance_covered',
-            'coverage_type',
         ];
     }
 
@@ -92,10 +89,6 @@ class MedicationService
      */
     public function normalizeBillingDefaults(array $data): array
     {
-        $data['insurance_price'] ??= $data['price'] ?? 0;
-        $data['is_insurance_covered'] ??= false;
-        $data['coverage_type'] ??= 'none';
-
         return $data;
     }
 
@@ -112,9 +105,6 @@ class MedicationService
             'service_description' => Arr::get($data, 'service_description', $drug->display_name),
             'service_code' => Arr::get($data, 'service_code'),
             'price' => Arr::get($data, 'price', 0),
-            'insurance_price' => Arr::get($data, 'insurance_price', Arr::get($data, 'price', 0)),
-            'is_insurance_covered' => Arr::get($data, 'is_insurance_covered', false),
-            'coverage_type' => Arr::get($data, 'coverage_type', 'none'),
             'requires_payment_before' => Arr::get($data, 'requires_payment_before', false),
             'requires_prescription' => Arr::get($data, 'requires_prescription', false),
             'billing_type' => Arr::get($data, 'billing_type', 'fixed'),
@@ -167,9 +157,6 @@ class MedicationService
 
         return [
             'price' => $service->price,
-            'insurance_price' => $service->insurance_price,
-            'is_insurance_covered' => $service->is_insurance_covered,
-            'coverage_type' => $service->coverage_type?->value ?? 'none',
         ];
     }
 
