@@ -2,9 +2,12 @@
 
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Tables;
 
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\DispenseResource;
 use Modules\Pharmacy\Models\Dispense;
 
 class DispensesTable
@@ -13,6 +16,7 @@ class DispensesTable
     {
         return $table
             ->columns([
+                TextColumn::make('branch.name')->label(__('Branch'))->searchable()->sortable()->toggleable(),
                 TextColumn::make('requestItem.serviceRequest.request_number')->label('Request #')->searchable(),
                 TextColumn::make('medication.generic_name')->label('Medication')->searchable(),
                 TextColumn::make('quantity')
@@ -23,7 +27,12 @@ class DispensesTable
                 TextColumn::make('batch_number')->toggleable(),
             ])
             ->recordActions([
+                Action::make('activities')
+                    ->label('Activities')
+                    ->icon('heroicon-o-bell-alert')
+                    ->url(fn ($record) => DispenseResource::getUrl('activities', ['record' => $record])),
                 ViewAction::make(),
+                EditAction::make(),
             ]);
     }
 }

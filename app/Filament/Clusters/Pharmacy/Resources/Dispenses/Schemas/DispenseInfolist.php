@@ -12,6 +12,7 @@ class DispenseInfolist
     {
         return $schema
             ->components([
+                TextEntry::make('branch.name')->label(__('Branch')),
                 TextEntry::make('requestItem.serviceRequest.request_number')->label('Request #'),
                 TextEntry::make('requestItem.service.name')->label('Service'),
                 TextEntry::make('medication.generic_name')->label('Medication'),

@@ -141,6 +141,58 @@ class DispenseServiceTest extends TestCase
         ], $pharmacyUser);
     }
 
+    public function test_it_persists_branch_id_from_service_request_on_dispense(): void
+    {
+        [$branch, , $requestItem, $medication] = $this->seedDispenseFixture(false);
+        StockItem::factory()->create([
+            'branch_id' => $branch->id,
+            'medication_id' => $medication->id,
+            'quantity_on_hand' => 12,
+        ]);
+
+        $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
+        Role::findOrCreate('pharmacist', 'web');
+        $pharmacyUser->assignRole('pharmacist');
+
+        $dispense = app(DispenseService::class)->dispense($requestItem, [
+            'medication_id' => $medication->id,
+            'quantity' => 1,
+        ], $pharmacyUser);
+
+        $this->assertSame($branch->id, $dispense->branch_id);
+        $this->assertDatabaseHas('dispenses', [
+            'id' => $dispense->id,
+            'branch_id' => $branch->id,
+        ]);
+    }
+
+    public function test_branch_id_is_mutable(): void
+    {
+        [$branch, , $requestItem, $medication] = $this->seedDispenseFixture(false);
+        StockItem::factory()->create([
+            'branch_id' => $branch->id,
+            'medication_id' => $medication->id,
+            'quantity_on_hand' => 12,
+        ]);
+
+        $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
+        Role::findOrCreate('pharmacist', 'web');
+        $pharmacyUser->assignRole('pharmacist');
+
+        $dispense = app(DispenseService::class)->dispense($requestItem, [
+            'medication_id' => $medication->id,
+            'quantity' => 1,
+        ], $pharmacyUser);
+
+        $otherBranch = Branch::factory()->create([
+            'organization_id' => $branch->organization_id,
+        ]);
+
+        $dispense->update(['branch_id' => $otherBranch->id]);
+
+        $this->assertSame($otherBranch->id, $dispense->fresh()->branch_id);
+    }
+
     /**
      * @return array{Branch, Service, RequestItem, Medication}
      */

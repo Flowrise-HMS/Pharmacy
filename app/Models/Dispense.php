@@ -4,20 +4,21 @@ namespace Modules\Pharmacy\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Clinical\Models\RequestItem;
+use Modules\Core\Models\BaseModel;
 use Modules\Core\Models\Unit;
 use Modules\Pharmacy\Database\Factories\DispenseFactory;
 use Modules\Pharmacy\Enums\DispenseFulfillmentType;
 
-class Dispense extends Model
+class Dispense extends BaseModel
 {
     use HasFactory, HasUuids;
 
     protected $keyType = 'string';
 
     protected $fillable = [
+        'branch_id',
         'request_item_id',
         'medication_id',
         'dispensed_by',

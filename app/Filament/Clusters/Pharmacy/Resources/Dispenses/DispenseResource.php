@@ -8,8 +8,11 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Modules\Core\Enums\NavigationGroup;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\PharmacyCluster;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Pages\EditDispense;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Pages\ListDispenseActivities;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Pages\ListDispenses;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Pages\ViewDispense;
+use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Schemas\DispenseForm;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Schemas\DispenseInfolist;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\Tables\DispensesTable;
 use Modules\Pharmacy\Models\Dispense;
@@ -23,6 +26,11 @@ class DispenseResource extends Resource
     protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::CLINICAL;
 
     protected static ?string $cluster = PharmacyCluster::class;
+
+    public static function form(Schema $schema): Schema
+    {
+        return DispenseForm::configure($schema);
+    }
 
     public static function infolist(Schema $schema): Schema
     {
@@ -39,6 +47,8 @@ class DispenseResource extends Resource
         return [
             'index' => ListDispenses::route('/'),
             'view' => ViewDispense::route('/{record}'),
+            'edit' => EditDispense::route('/{record}/edit'),
+            'activities' => ListDispenseActivities::route('/{record}/activities'),
         ];
     }
 }

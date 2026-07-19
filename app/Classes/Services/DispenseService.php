@@ -75,6 +75,7 @@ class DispenseService
                 : DispenseFulfillmentType::IN_HOUSE;
 
             $dispense = Dispense::query()->create([
+                'branch_id' => $branchId,
                 'request_item_id' => $item->id,
                 'medication_id' => $medication->id,
                 'dispensed_by' => $dispensedBy->id,
@@ -146,8 +147,10 @@ class DispenseService
         }
 
         $medication = Medication::query()->where('service_id', $item->service_id)->first();
+        $branchId = (string) $item->serviceRequest->branch_id;
 
         $dispense = Dispense::query()->create([
+            'branch_id' => $branchId,
             'request_item_id' => $item->id,
             'medication_id' => $medication?->id,
             'dispensed_by' => $dispensedBy->id,

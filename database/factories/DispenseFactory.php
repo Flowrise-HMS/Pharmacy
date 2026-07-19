@@ -4,6 +4,7 @@ namespace Modules\Pharmacy\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Clinical\Models\RequestItem;
+use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Models\Dispense;
 use Modules\Pharmacy\Models\Medication;
 
@@ -14,6 +15,7 @@ class DispenseFactory extends Factory
     public function definition(): array
     {
         return [
+            'branch_id' => Branch::factory(),
             'request_item_id' => RequestItem::factory(),
             'medication_id' => Medication::factory(),
             'dispensed_by' => null,
