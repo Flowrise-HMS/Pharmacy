@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Context;
+use Modules\Core\Support\SuperAdmin;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\StockMovementResource;
 use Modules\Pharmacy\Models\Medication;
 
@@ -78,6 +79,7 @@ class StockMovementsTable
                     EditAction::make(),
                     DeleteAction::make(),
                     Action::make('activities')
+                        ->visible(fn (): bool => SuperAdmin::check())
                         ->label('Activities')
                         ->icon('heroicon-o-bell-alert')
                         ->url(fn ($record) => StockMovementResource::getUrl('activities', ['record' => $record])),
