@@ -180,7 +180,7 @@ class DispenseService
 
     protected function assertPharmacyStaff(User $dispensedBy): void
     {
-        if (! $dispensedBy->hasAnyRole(['pharmacist', 'pharmacy_technician'])) {
+        if (! $this->policy->isPharmacyStaff($dispensedBy)) {
             throw new UnauthorizedMedicationOrderException('Only pharmacy staff can dispense.');
         }
     }

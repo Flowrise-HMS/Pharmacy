@@ -24,6 +24,7 @@ use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 use Modules\Pharmacy\Models\StockItem;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -281,6 +282,8 @@ class PharmacyPosPrescriptionTest extends TestCase
             $pharmacist = User::factory()->create(['branch_id' => $branch->id]);
             Role::findOrCreate('pharmacist', 'web');
             $pharmacist->assignRole('pharmacist');
+            Permission::findOrCreate('dispense_medication', 'web');
+            $pharmacist->givePermissionTo('dispense_medication');
         }
 
         $category = ServiceCategory::factory()->create(['code' => 'M'.substr(uniqid(), -6)]);
@@ -365,6 +368,8 @@ class PharmacyPosPrescriptionTest extends TestCase
         $pharmacist = User::factory()->create(['branch_id' => $branch->id]);
         Role::findOrCreate('pharmacist', 'web');
         $pharmacist->assignRole('pharmacist');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $pharmacist->givePermissionTo('dispense_medication');
 
         $items = [];
 

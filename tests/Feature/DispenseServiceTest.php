@@ -15,6 +15,7 @@ use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 use Modules\Pharmacy\Models\StockItem;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -40,6 +41,8 @@ class DispenseServiceTest extends TestCase
         $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
         Role::findOrCreate('pharmacist', 'web');
         $pharmacyUser->assignRole('pharmacist');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $pharmacyUser->givePermissionTo('dispense_medication');
 
         $dispense = app(DispenseService::class)->dispense($requestItem, [
             'medication_id' => $medication->id,
@@ -78,6 +81,8 @@ class DispenseServiceTest extends TestCase
         $pharmacyUser = User::factory()->create();
         Role::findOrCreate('pharmacist', 'web');
         $pharmacyUser->assignRole('pharmacist');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $pharmacyUser->givePermissionTo('dispense_medication');
 
         $this->expectException(UnauthorizedMedicationOrderException::class);
 
@@ -103,6 +108,8 @@ class DispenseServiceTest extends TestCase
         $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
         Role::findOrCreate('pharmacist', 'web');
         $pharmacyUser->assignRole('pharmacist');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $pharmacyUser->givePermissionTo('dispense_medication');
 
         app(DispenseService::class)->dispense($requestItem, [
             'medication_id' => $medication->id,
@@ -127,6 +134,8 @@ class DispenseServiceTest extends TestCase
         $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
         Role::findOrCreate('pharmacist', 'web');
         $pharmacyUser->assignRole('pharmacist');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $pharmacyUser->givePermissionTo('dispense_medication');
 
         app(DispenseService::class)->dispense($requestItem, [
             'medication_id' => $medication->id,
@@ -153,6 +162,8 @@ class DispenseServiceTest extends TestCase
         $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
         Role::findOrCreate('pharmacist', 'web');
         $pharmacyUser->assignRole('pharmacist');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $pharmacyUser->givePermissionTo('dispense_medication');
 
         $dispense = app(DispenseService::class)->dispense($requestItem, [
             'medication_id' => $medication->id,
@@ -178,6 +189,8 @@ class DispenseServiceTest extends TestCase
         $pharmacyUser = User::factory()->create(['branch_id' => $branch->id]);
         Role::findOrCreate('pharmacist', 'web');
         $pharmacyUser->assignRole('pharmacist');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $pharmacyUser->givePermissionTo('dispense_medication');
 
         $dispense = app(DispenseService::class)->dispense($requestItem, [
             'medication_id' => $medication->id,
@@ -191,6 +204,27 @@ class DispenseServiceTest extends TestCase
         $dispense->update(['branch_id' => $otherBranch->id]);
 
         $this->assertSame($otherBranch->id, $dispense->fresh()->branch_id);
+    }
+
+    public function test_super_admin_can_record_outside_purchase(): void
+    {
+        [, , $requestItem, $medication] = $this->seedDispenseFixture(false);
+
+        $superAdmin = User::factory()->create();
+        Role::findOrCreate('super_admin', 'web');
+        $superAdmin->assignRole('super_admin');
+        Permission::findOrCreate('dispense_medication', 'web');
+        $superAdmin->givePermissionTo('dispense_medication');
+
+        $dispense = app(DispenseService::class)->recordOutsidePurchase(
+            $requestItem,
+            $superAdmin,
+            'Obtain from licensed community pharmacy',
+        );
+
+        $this->assertSame($requestItem->id, $dispense->request_item_id);
+        $this->assertSame($superAdmin->id, $dispense->dispensed_by);
+        $this->assertSame(0, $dispense->quantity);
     }
 
     /**

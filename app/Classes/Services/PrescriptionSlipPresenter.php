@@ -129,7 +129,7 @@ class PrescriptionSlipPresenter
 
     protected function assertPharmacyStaff(User $user): void
     {
-        if (! $user->hasAnyRole(['pharmacist', 'pharmacy_technician'])) {
+        if (! $user->can('dispense_medication')) {
             throw new UnauthorizedMedicationOrderException('Only pharmacy staff can view prescription slips.');
         }
     }
