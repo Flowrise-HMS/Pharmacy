@@ -45,7 +45,7 @@
                     <x-filament::input.wrapper>
                         <x-filament::input
                             type="text"
-                            placeholder="{{ __('Search patient…') }}"
+                            placeholder="{{ __('Search by name, MRN, phone, email…') }}"
                             wire:model.live.debounce.300ms="patientSearch"
                             prefix-icon="heroicon-m-user"
                         />

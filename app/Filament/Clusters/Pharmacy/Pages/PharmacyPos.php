@@ -28,6 +28,7 @@ use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Core\Settings\FeatureSettings;
+use Modules\Patient\Classes\Services\PatientSearchService;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
 use Modules\Pharmacy\Classes\Support\PharmacyPosTotals;
@@ -182,21 +183,18 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function updatedPatientSearch($value): void
     {
-        if (blank($value) || ! class_exists(Patient::class)) {
+        if (blank($value) || mb_strlen(trim((string) $value)) < 2 || ! class_exists(Patient::class)) {
             $this->patientResults = collect();
 
             return;
         }
 
-        $this->patientResults = Patient::query()
-            ->where(function ($q) use ($value) {
-                $q->where('first_name', 'like', "%{$value}%")
-                    ->orWhere('last_name', 'like', "%{$value}%")
-                    ->orWhere('mrn', 'like', "%{$value}%");
-            })
-            ->limit(10)
-            ->get()
-            ->map(fn ($p) => ['id' => $p->id, 'label' => $p->full_name.' ('.$p->mrn.')']);
+        $this->patientResults = app(PatientSearchService::class)
+            ->search((string) $value, 10)
+            ->map(fn (Patient $patient): array => [
+                'id' => $patient->id,
+                'label' => $patient->full_name.' ('.$patient->mrn.')',
+            ]);
     }
 
     public function selectPatient($id): void
