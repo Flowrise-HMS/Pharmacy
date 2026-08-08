@@ -10,6 +10,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Utilities\Set;
+use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Classes\Services\DrugMaterializationService;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
@@ -51,11 +52,12 @@ class ListMedications extends ListRecords
                                 return;
                             }
 
-                            $set('service_name', $drug->display_name);
+                            $set('service_name', ucwords($drug->display_name));
                             $set('price', 0);
                         }),
                     TextInput::make('service_name')
                         ->required()
+                        ->label('Name')
                         ->maxLength(255),
                     TextInput::make('price')
                         ->numeric()
@@ -71,7 +73,9 @@ class ListMedications extends ListRecords
                         ->required()
                         ->default(false),
                     Select::make('branch_id')
+                        ->label('Branch')
                         ->searchable()
+                        ->default(app(BranchService::class)->getDefaultBranchId())
                         ->options(fn () => Branch::query()->active()->orderBy('name')->pluck('name', 'id')->toArray()),
                     TextInput::make('initial_stock_quantity')
                         ->numeric()
