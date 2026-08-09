@@ -32,3 +32,17 @@ it('computes schedules when frequency is a string', function (): void {
 
     expect($result['total_administrations'])->toBe(2);
 });
+
+it('leaves total administrations unbounded for PRN without a max', function (): void {
+    $calculator = app(PrescriptionScheduleCalculator::class);
+
+    $result = $calculator->compute([
+        'frequency' => 'qd',
+        'duration_days' => 2,
+        'prn' => true,
+        'course_started_at' => now(),
+    ]);
+
+    expect($result['total_administrations'])->toBeNull()
+        ->and($result['schedule_summary'])->toContain('PRN');
+});

@@ -14,6 +14,7 @@ use Modules\Clinical\Models\ServiceRequest;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Enums\AdministrationContext;
+use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
@@ -101,6 +102,7 @@ class MedicationOrderService
      */
     public function createPrescriptionDetail(RequestItem $item, array $itemData, ?Encounter $encounter): PrescriptionDetail
     {
+        $itemData = $this->normalizePrnAndFrequency($itemData);
         $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $administerInFacility = filter_var($itemData['administer_in_facility'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $context = isset($itemData['administration_context'])
@@ -152,8 +154,83 @@ class MedicationOrderService
         return $detail;
     }
 
+    /**
+     * @param  array<string, mixed>  $itemData
+     * @return array<string, mixed>
+     */
+    public function normalizePrnAndFrequency(array $itemData): array
+    {
+        $frequency = $itemData['frequency'] ?? null;
+        $frequencyEnum = $frequency instanceof MedicationFrequency
+            ? $frequency
+            : (is_string($frequency) ? MedicationFrequency::tryFrom($frequency) : null);
+
+        $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN)
+            || $frequencyEnum === MedicationFrequency::PRN;
+
+        if ($isPrn) {
+            $itemData['prn'] = true;
+            $itemData['frequency'] = MedicationFrequency::PRN->value;
+        } else {
+            $itemData['prn'] = false;
+            if ($frequencyEnum instanceof MedicationFrequency) {
+                $itemData['frequency'] = $frequencyEnum->value;
+            }
+        }
+
+        return $itemData;
+    }
+
+    /**
+     * Clear mistaken PRN on a fixed-frequency order and recompute the dose cap.
+     */
+    public function convertMistakenPrnToScheduledCourse(PrescriptionDetail $detail): PrescriptionDetail
+    {
+        $frequency = $detail->frequency instanceof MedicationFrequency
+            ? $detail->frequency
+            : (is_string($detail->frequency) ? MedicationFrequency::tryFrom($detail->frequency) : null);
+
+        if ($frequency === null || $frequency === MedicationFrequency::PRN) {
+            throw new \InvalidArgumentException('Only fixed-frequency orders can be converted from mistaken PRN.');
+        }
+
+        $detail->forceFill([
+            'prn' => false,
+            'max_administrations' => null,
+        ]);
+
+        return $this->recomputeScheduleForDetail($detail);
+    }
+
+    public function recomputeScheduleForDetail(PrescriptionDetail $detail): PrescriptionDetail
+    {
+        $schedule = $this->scheduleCalculator->compute([
+            'frequency' => $detail->frequency,
+            'duration_days' => $detail->duration_days ?? 1,
+            'prn' => (bool) $detail->prn,
+            'course_started_at' => $detail->course_started_at ?? now(),
+            'max_administrations' => $detail->max_administrations,
+        ]);
+
+        $detail->update([
+            'prn' => (bool) $detail->prn,
+            'total_administrations' => $schedule['total_administrations'],
+            'course_started_at' => $schedule['course_started_at'],
+            'course_end_at' => $schedule['course_end_at'],
+            'max_administrations' => $detail->max_administrations,
+        ]);
+
+        $item = $detail->requestItem;
+        if ($item) {
+            $this->doseScheduleService->syncNextDoseAt($item);
+        }
+
+        return $detail->fresh();
+    }
+
     public function previewSchedule(array $itemData, ?Encounter $encounter = null): array
     {
+        $itemData = $this->normalizePrnAndFrequency($itemData);
         $courseStartedAt = $encounter?->admitted_at ?? now();
 
         return $this->scheduleCalculator->compute([

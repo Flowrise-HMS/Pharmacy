@@ -24,7 +24,6 @@ use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
 use Modules\Pharmacy\Classes\Services\MedicationService;
-use Modules\Pharmacy\Classes\Services\PrescriptionScheduleCalculator;
 use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Enums\MedicationFrequency;
@@ -159,7 +158,32 @@ class MedicationOrderAction
                                     ->options(MedicationFrequency::class)
                                     ->searchable()
                                     ->required()
-                                    ->live(),
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, callable $set): void {
+                                        if ($state === MedicationFrequency::PRN->value) {
+                                            $set('prn', true);
+
+                                            return;
+                                        }
+
+                                        $set('prn', false);
+                                    }),
+
+                                Checkbox::make('prn')
+                                    ->label('Take as needed (PRN)')
+                                    ->helperText('PRN replaces a fixed dose schedule. Uncheck and choose QD/BID/etc for a capped course.')
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get): void {
+                                        if (filter_var($state, FILTER_VALIDATE_BOOLEAN)) {
+                                            $set('frequency', MedicationFrequency::PRN->value);
+
+                                            return;
+                                        }
+
+                                        if (($get('frequency') ?? null) === MedicationFrequency::PRN->value) {
+                                            $set('frequency', MedicationFrequency::QD->value);
+                                        }
+                                    }),
 
                                 Select::make('route')
                                     ->label('Route')
@@ -199,12 +223,11 @@ class MedicationOrderAction
                                     ->label('Dose schedule (computed)')
                                     ->content(function ($get) use ($encounterId) {
                                         $encounter = $encounterId ? Encounter::find($encounterId) : null;
-                                        $schedule = app(PrescriptionScheduleCalculator::class)->compute([
+                                        $schedule = app(MedicationOrderService::class)->previewSchedule([
                                             'frequency' => $get('frequency') ?? 'qd',
                                             'duration_days' => $get('duration_days') ?? 1,
                                             'prn' => $get('prn') ?? false,
-                                            'course_started_at' => $encounter?->admitted_at ?? now(),
-                                        ]);
+                                        ], $encounter);
 
                                         return ($schedule['schedule_summary'] ?? '')
                                             .' · ends '.$schedule['course_end_at']->format('D M H:i');
@@ -215,10 +238,6 @@ class MedicationOrderAction
                                     ->label('SIG / Instructions')
                                     ->rows(2)
                                     ->columnSpanFull(),
-
-                                Checkbox::make('prn')
-                                    ->label('Take as needed (PRN)')
-                                    ->live(),
 
                                 TextInput::make('indication')
                                     ->label('Indication'),
