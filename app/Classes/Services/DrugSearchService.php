@@ -3,9 +3,9 @@
 namespace Modules\Pharmacy\Classes\Services;
 
 use Illuminate\Support\Collection;
-use Modules\Core\Settings\PharmacySettings;
 use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
+use Modules\Pharmacy\Settings\PharmacySettings;
 
 class DrugSearchService
 {

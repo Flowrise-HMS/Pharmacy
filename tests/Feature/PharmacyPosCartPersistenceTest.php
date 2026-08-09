@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Cache\DatabaseStore;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
@@ -30,7 +31,7 @@ beforeEach(function (): void {
 it('persists and restores the cart across page reloads', function (): void {
     $this->actingAs($this->user);
 
-    expect(Cache::store())->toBeInstanceOf(\Illuminate\Cache\DatabaseStore::class);
+    expect(Cache::store())->toBeInstanceOf(DatabaseStore::class);
 
     $cart = collect([
         'm1' => [
