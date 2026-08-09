@@ -819,7 +819,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
         }
 
         Cache::put($this->cartCacheKey, [
-            'items' => $this->cart,
+            'items' => $this->cart->toArray(),
             'guest_name' => $this->guestName,
             'guest_phone' => $this->guestPhone,
             'guest_email' => $this->guestEmail,
@@ -840,7 +840,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $cached = Cache::get($this->cartCacheKey);
 
         if (is_array($cached) && ! empty($cached)) {
-            $this->cart = $cached['items'] ?? collect();
+            $items = $cached['items'] ?? [];
+            $this->cart = is_array($items) ? collect($items) : collect();
             $this->guestName = $cached['guest_name'] ?? null;
             $this->guestPhone = $cached['guest_phone'] ?? null;
             $this->guestEmail = $cached['guest_email'] ?? null;
