@@ -10,12 +10,12 @@ use Modules\Pharmacy\Models\PrescriptionDetail;
 class PrescriptionScheduleCalculator
 {
     /**
-     * @param  array{frequency?:string,duration_days?:int,prn?:bool,course_started_at?:Carbon|string|null,max_administrations?:int|null}  $input
+     * @param  array{frequency?:MedicationFrequency|string|null,duration_days?:int,prn?:bool,course_started_at?:Carbon|string|null,max_administrations?:int|null}  $input
      * @return array{total_administrations:?int,course_end_at:Carbon,course_started_at:Carbon,schedule_summary:string}
      */
     public function compute(array $input): array
     {
-        $frequency = MedicationFrequency::tryFrom($input['frequency'] ?? '');
+        $frequency = $this->normalizeFrequency($input['frequency'] ?? null);
         $durationDays = max(1, (int) ($input['duration_days'] ?? 1));
         $isPrn = filter_var($input['prn'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $courseStartedAt = isset($input['course_started_at'])
@@ -48,7 +48,8 @@ class PrescriptionScheduleCalculator
 
         $timesPerDay = $frequency?->timesPerDay() ?? 1;
         $totalAdministrations = $timesPerDay * $durationDays;
-        $freqLabel = $frequency?->getLabel() ?? ($input['frequency'] ?? 'Unknown');
+        $freqLabel = $frequency?->getLabel()
+            ?? (is_string($input['frequency'] ?? null) ? (string) $input['frequency'] : 'Unknown');
 
         return [
             'total_administrations' => $totalAdministrations,
@@ -63,7 +64,7 @@ class PrescriptionScheduleCalculator
      */
     public function buildDoseSchedule(PrescriptionDetail $detail): array
     {
-        $frequency = MedicationFrequency::tryFrom($detail->frequency ?? '');
+        $frequency = $this->normalizeFrequency($detail->frequency);
         $courseStartedAt = Carbon::parse($detail->course_started_at ?? now());
         $durationDays = max(1, (int) ($detail->duration_days ?? 1));
 
@@ -115,6 +116,19 @@ class PrescriptionScheduleCalculator
         }
 
         return $slots;
+    }
+
+    protected function normalizeFrequency(MedicationFrequency|string|null $frequency): ?MedicationFrequency
+    {
+        if ($frequency instanceof MedicationFrequency) {
+            return $frequency;
+        }
+
+        if (! is_string($frequency) || $frequency === '') {
+            return null;
+        }
+
+        return MedicationFrequency::tryFrom($frequency);
     }
 
     /**
