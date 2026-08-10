@@ -31,7 +31,7 @@ beforeEach(function (): void {
 it('persists and restores the cart across page reloads', function (): void {
     $this->actingAs($this->user);
 
-    expect(Cache::store())->toBeInstanceOf(DatabaseStore::class);
+    expect(Cache::store()->getStore())->toBeInstanceOf(DatabaseStore::class);
 
     $cart = collect([
         'm1' => [
