@@ -2,9 +2,11 @@
 
 namespace Modules\Pharmacy\Providers;
 
+use Modules\Clinical\Contracts\PrescriptionScheduleCalculatorContract;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Contracts\PharmacyLowStockProviderContract;
 use Modules\Core\Contracts\StockProviderContract;
+use Modules\Pharmacy\Classes\Services\PrescriptionScheduleCalculator;
 use Modules\Pharmacy\Classes\Services\StockService;
 use Modules\Pharmacy\Classes\Support\PharmacyLowStockProvider;
 use Modules\Pharmacy\Console\BackfillMedicationBillingServicesCommand;
@@ -12,6 +14,7 @@ use Modules\Pharmacy\Console\BackfillMedicationUnitsCommand;
 use Modules\Pharmacy\Console\BackfillPrescriptionDetailsCommand;
 use Modules\Pharmacy\Console\ImportFDANdcDrugData;
 use Modules\Pharmacy\Models\Dispense;
+use Modules\Pharmacy\Models\PrescriptionDetail;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class PharmacyServiceProvider extends ModuleServiceProvider
@@ -31,6 +34,7 @@ class PharmacyServiceProvider extends ModuleServiceProvider
 
         $this->app->bind(StockProviderContract::class, StockService::class);
         $this->app->bind(PharmacyLowStockProviderContract::class, PharmacyLowStockProvider::class);
+        $this->app->bind(PrescriptionScheduleCalculatorContract::class, PrescriptionScheduleCalculator::class);
     }
 
     public function boot(): void
@@ -39,7 +43,10 @@ class PharmacyServiceProvider extends ModuleServiceProvider
 
         if (class_exists(RequestItem::class)) {
             RequestItem::resolveRelationUsing('dispenses', function ($requestItem) {
-                return $requestItem->hasMany(Dispense::class);
+                return $requestItem->hasMany(Dispense::class, 'request_item_id', 'id');
+            });
+            RequestItem::resolveRelationUsing('prescriptionDetail', function ($requestItem) {
+                return $requestItem->hasOne(PrescriptionDetail::class, 'request_item_id', 'id');
             });
         }
 

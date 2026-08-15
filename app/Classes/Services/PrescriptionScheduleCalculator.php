@@ -3,11 +3,12 @@
 namespace Modules\Pharmacy\Classes\Services;
 
 use Carbon\Carbon;
+use Modules\Clinical\Contracts\PrescriptionScheduleCalculatorContract;
 use Modules\Pharmacy\Classes\Data\DoseSlot;
 use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 
-class PrescriptionScheduleCalculator
+class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorContract
 {
     /**
      * @param  array{frequency?:MedicationFrequency|string|null,duration_days?:int,prn?:bool,course_started_at?:Carbon|string|null,max_administrations?:int|null}  $input
@@ -62,8 +63,12 @@ class PrescriptionScheduleCalculator
     /**
      * @return list<DoseSlot>
      */
-    public function buildDoseSchedule(PrescriptionDetail $detail): array
+    public function buildDoseSchedule(object $detail): array
     {
+        if (! $detail instanceof PrescriptionDetail) {
+            return [];
+        }
+
         $frequency = $this->normalizeFrequency($detail->frequency);
         $courseStartedAt = Carbon::parse($detail->course_started_at ?? now());
         $durationDays = max(1, (int) ($detail->duration_days ?? 1));
