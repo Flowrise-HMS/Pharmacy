@@ -19,15 +19,14 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
-use Modules\Billing\Enums\PaymentMethod;
-use Modules\Billing\Filament\Clusters\Billing\Pages\BillingDesk;
-use Modules\Billing\Models\Payment;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Core\Settings\FeatureSettings;
+use Modules\Core\Support\ModuleAvailability;
+use Modules\Core\Support\OptionalClass;
 use Modules\Patient\Classes\Services\PatientSearchService;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
@@ -99,7 +98,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
     {
         $this->cart = collect();
         $this->patientResults = collect();
-        $this->paymentMethod = PaymentMethod::Cash->value;
+        $this->paymentMethod = $this->defaultPaymentMethodValue();
         $this->viewModeSessionKey = Auth::id().'_pharmacy_pos_view_mode';
         $this->viewMode = Session::get($this->viewModeSessionKey, 'card');
         $this->activeTab = Session::get('pharmacy_pos_active_tab', 'medications');
@@ -615,6 +614,16 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function checkout(): void
     {
+        if (! ModuleAvailability::billingEnabled()) {
+            Notification::make()
+                ->danger()
+                ->title(__('Billing is unavailable'))
+                ->body(__('Enable the Billing module to complete POS checkout.'))
+                ->send();
+
+            return;
+        }
+
         if ($this->cart->isEmpty()) {
             Notification::make()
                 ->danger()
@@ -700,7 +709,11 @@ class PharmacyPos extends Page implements HasActions, HasTable
                     'id' => $item['id'],
                     'quantity' => $item['quantity'],
                 ])->values()->toArray(),
-                'payment_method' => PaymentMethod::from($this->paymentMethod),
+                'payment_method' => OptionalClass::when(
+                    'Modules\\Billing\\Enums\\PaymentMethod',
+                    fn (string $class) => $class::from($this->paymentMethod),
+                    'Billing',
+                ) ?? $this->paymentMethod,
                 'pos_discount_amount' => $discountStr,
                 'amount_tendered' => $amountTendered,
             ]);
@@ -735,6 +748,16 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function checkoutChargeToAccount(): void
     {
+        if (! ModuleAvailability::billingEnabled()) {
+            Notification::make()
+                ->danger()
+                ->title(__('Billing is unavailable'))
+                ->body(__('Enable the Billing module to charge a patient account.'))
+                ->send();
+
+            return;
+        }
+
         try {
             $discountStr = PharmacyPosTotals::normalizeMoney($this->discount);
 
@@ -755,22 +778,30 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
             $invoice = $result['invoice'];
 
-            $billingDeskUrl = BillingDesk::getUrl(['invoice' => $invoice->id]);
+            $billingDeskUrl = OptionalClass::when(
+                'Modules\\Billing\\Filament\\Clusters\\Billing\\Pages\\BillingDesk',
+                fn (string $page) => $page::getUrl(['invoice' => $invoice->id]),
+                'Billing',
+            );
 
             $this->lastInvoiceNumber = $invoice->invoice_number;
 
-            Notification::make()
+            $notification = Notification::make()
                 ->title(__('Charge created'))
                 ->body(__('Invoice :number sent to billing desk.', ['number' => $invoice->invoice_number]))
                 ->success()
-                ->duration(10000)
-                ->actions([
+                ->duration(10000);
+
+            if (is_string($billingDeskUrl) && $billingDeskUrl !== '') {
+                $notification->actions([
                     Action::make('open_billing')
                         ->label(__('Open in Billing Desk'))
                         ->button()
                         ->url($billingDeskUrl),
-                ])
-                ->send();
+                ]);
+            }
+
+            $notification->send();
 
             if ($this->autoPrintReceipt) {
                 $invoiceUrl = $this->buildInvoiceUrl($invoice->id);
@@ -802,7 +833,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->grandTotal = 0;
         $this->amountPaid = null;
         $this->change = 0;
-        $this->paymentMethod = PaymentMethod::Cash->value;
+        $this->paymentMethod = $this->defaultPaymentMethodValue();
         $this->clearCartCache();
     }
 
@@ -847,7 +878,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
             $this->guestEmail = $cached['guest_email'] ?? null;
             $this->discount = $cached['discount'] ?? 0;
             $this->amountPaid = $cached['amount_paid'] ?? null;
-            $this->paymentMethod = $cached['payment_method'] ?? PaymentMethod::Cash->value;
+            $this->paymentMethod = $cached['payment_method'] ?? $this->defaultPaymentMethodValue();
             $this->selectedPatientId = $cached['selected_patient_id'] ?? null;
             $this->autoPrintReceipt = $cached['auto_print_receipt'] ?? false;
         }
@@ -892,11 +923,29 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function canCreatePayment(): bool
     {
+        if (! ModuleAvailability::billingEnabled()) {
+            return false;
+        }
+
         if (! app_settings($this->selectedBranchId)->pharmacyPosCollectPaymentEnabled()) {
             return false;
         }
 
-        return auth()->user()?->can('create', Payment::class) ?? false;
+        $paymentClass = OptionalClass::resolve('Modules\\Billing\\Models\\Payment', 'Billing');
+        if ($paymentClass === null) {
+            return false;
+        }
+
+        return auth()->user()?->can('create', $paymentClass) ?? false;
+    }
+
+    protected function defaultPaymentMethodValue(): string
+    {
+        return OptionalClass::when(
+            'Modules\\Billing\\Enums\\PaymentMethod',
+            fn (string $class) => $class::Cash->value,
+            'Billing',
+        ) ?? 'cash';
     }
 
     /** @return array<int, string> */

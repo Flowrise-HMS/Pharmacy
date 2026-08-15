@@ -4,14 +4,14 @@ namespace Modules\Pharmacy\Classes\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Modules\Billing\Enums\InvoiceLineStatus;
-use Modules\Billing\Models\InvoiceLine;
 use Modules\Clinical\Enums\MedicationAdministrationStatus;
 use Modules\Clinical\Enums\RequestItemStatus;
 use Modules\Clinical\Models\MedicationAdministration;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
+use Modules\Core\Support\ModuleAvailability;
+use Modules\Core\Support\OptionalClass;
 use Modules\Pharmacy\Data\PharmacyReportCriteria;
 use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Enums\DispenseFulfillmentType;
@@ -99,6 +99,16 @@ class PharmacyAnalyticsService
      */
     public function getRevenueSummary(PharmacyReportCriteria $criteria): array
     {
+        if (! $this->billingRevenueAvailable()) {
+            return [
+                'total_sales' => '0.00',
+                'medication_sales' => '0.00',
+                'service_sales' => '0.00',
+                'transaction_count' => 0,
+                'avg_ticket' => null,
+            ];
+        }
+
         $medicationSales = $this->sumLineRevenue($this->medicationRevenueLinesQuery($criteria));
         $serviceSales = $this->sumLineRevenue($this->serviceRevenueLinesQuery($criteria));
 
@@ -159,6 +169,14 @@ class PharmacyAnalyticsService
             $dayEnd = $cursor->copy()->endOfDay();
             $labels[] = $cursor->format('M j');
 
+            if (! $this->billingRevenueAvailable()) {
+                $medicationAmounts[] = 0.0;
+                $serviceAmounts[] = 0.0;
+                $cursor->addDay();
+
+                continue;
+            }
+
             $dayCriteria = new PharmacyReportCriteria(
                 startDate: $dayStart,
                 endDate: $dayEnd,
@@ -206,13 +224,21 @@ class PharmacyAnalyticsService
             );
 
             if ($lineKind === 'service') {
-                $amounts[] = (float) $this->sumLineRevenue($this->serviceRevenueLinesQuery($criteria));
+                $amounts[] = $this->billingRevenueAvailable()
+                    ? (float) $this->sumLineRevenue($this->serviceRevenueLinesQuery($criteria))
+                    : 0.0;
             } elseif ($lineKind === 'medication') {
-                $amounts[] = (float) $this->sumLineRevenue($this->medicationRevenueLinesQuery($criteria));
+                $amounts[] = $this->billingRevenueAvailable()
+                    ? (float) $this->sumLineRevenue($this->medicationRevenueLinesQuery($criteria))
+                    : 0.0;
             } else {
-                $med = $this->sumLineRevenue($this->medicationRevenueLinesQuery($criteria));
-                $svc = $this->sumLineRevenue($this->serviceRevenueLinesQuery($criteria));
-                $amounts[] = (float) bcadd($med, $svc, 2);
+                if (! $this->billingRevenueAvailable()) {
+                    $amounts[] = 0.0;
+                } else {
+                    $med = $this->sumLineRevenue($this->medicationRevenueLinesQuery($criteria));
+                    $svc = $this->sumLineRevenue($this->serviceRevenueLinesQuery($criteria));
+                    $amounts[] = (float) bcadd($med, $svc, 2);
+                }
             }
         }
 
@@ -559,6 +585,10 @@ class PharmacyAnalyticsService
      */
     public function getRecentPosSales(PharmacyReportCriteria $criteria, int $limit = 25): array
     {
+        if (! $this->billingRevenueAvailable()) {
+            return [];
+        }
+
         $posCriteria = new PharmacyReportCriteria(
             startDate: $criteria->startDate,
             endDate: $criteria->endDate,
@@ -572,7 +602,7 @@ class PharmacyAnalyticsService
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get()
-            ->map(function (InvoiceLine $line): array {
+            ->map(function (object $line): array {
                 $invoice = $line->invoice;
                 $customer = $invoice?->clientIdentity()->name ?? '—';
 
@@ -634,7 +664,7 @@ class PharmacyAnalyticsService
     public function medicationRevenueLinesQuery(PharmacyReportCriteria $criteria): Builder
     {
         if ($criteria->lineKind === 'service') {
-            return InvoiceLine::query()->whereRaw('1 = 0');
+            return $this->emptyRevenueLinesQuery();
         }
 
         return $this->baseRevenueLinesQuery($criteria)->where(function (Builder $outer) use ($criteria): void {
@@ -655,7 +685,7 @@ class PharmacyAnalyticsService
     public function serviceRevenueLinesQuery(PharmacyReportCriteria $criteria): Builder
     {
         if ($criteria->lineKind === 'medication' || $criteria->channel === 'clinical') {
-            return InvoiceLine::query()->whereRaw('1 = 0');
+            return $this->emptyRevenueLinesQuery();
         }
 
         return $this->baseRevenueLinesQuery($criteria)
@@ -701,8 +731,15 @@ class PharmacyAnalyticsService
 
     protected function baseRevenueLinesQuery(PharmacyReportCriteria $criteria): Builder
     {
-        return InvoiceLine::query()
-            ->where('line_status', '!=', InvoiceLineStatus::Void)
+        $invoiceLineClass = $this->invoiceLineClass();
+        $statusClass = $this->invoiceLineStatusClass();
+
+        if ($invoiceLineClass === null || $statusClass === null) {
+            throw new \RuntimeException('Billing is not available for pharmacy revenue queries.');
+        }
+
+        return $invoiceLineClass::query()
+            ->where('line_status', '!=', $statusClass::Void)
             ->whereBetween('created_at', [
                 $criteria->startDate->copy()->startOfDay(),
                 $criteria->endDate->copy()->endOfDay(),
@@ -710,6 +747,33 @@ class PharmacyAnalyticsService
             ->when($criteria->branchId, function (Builder $query) use ($criteria): void {
                 $query->whereHas('invoice', fn (Builder $invoice) => $invoice->where('branch_id', $criteria->branchId));
             });
+    }
+
+    protected function billingRevenueAvailable(): bool
+    {
+        return ModuleAvailability::billingEnabled()
+            && $this->invoiceLineClass() !== null
+            && $this->invoiceLineStatusClass() !== null;
+    }
+
+    protected function invoiceLineClass(): ?string
+    {
+        return OptionalClass::resolve('Modules\\Billing\\Models\\InvoiceLine', 'Billing');
+    }
+
+    protected function invoiceLineStatusClass(): ?string
+    {
+        return OptionalClass::resolve('Modules\\Billing\\Enums\\InvoiceLineStatus', 'Billing');
+    }
+
+    protected function emptyRevenueLinesQuery(): Builder
+    {
+        $invoiceLineClass = $this->invoiceLineClass();
+        if ($invoiceLineClass === null) {
+            throw new \RuntimeException('Billing is not available for pharmacy revenue queries.');
+        }
+
+        return $invoiceLineClass::query()->whereRaw('1 = 0');
     }
 
     protected function pharmacyRequestItemsQuery(?string $branchId = null): Builder

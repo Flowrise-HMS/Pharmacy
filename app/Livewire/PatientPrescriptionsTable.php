@@ -14,8 +14,8 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
-use Modules\Billing\Enums\InvoiceLineStatus;
 use Modules\Clinical\Models\RequestItem;
+use Modules\Core\Support\OptionalClass;
 use Modules\Pharmacy\Classes\Services\PharmacyPosPrescriptionService;
 use Modules\Pharmacy\Enums\DispenseFulfillmentType;
 use Modules\Pharmacy\Filament\Concerns\HandlesPosPrescriptionFulfillmentActions;
@@ -76,11 +76,29 @@ class PatientPrescriptionsTable extends Component implements HasActions, HasSche
                     ->label(__('Payment'))
                     ->badge()
                     ->getStateUsing(fn (RequestItem $record): string => $record->payment_status?->getLabel() ?? __('Not billed'))
-                    ->color(fn (RequestItem $record): string => match ($record->payment_status) {
-                        InvoiceLineStatus::Paid => 'success',
-                        InvoiceLineStatus::Unpaid => 'warning',
-                        InvoiceLineStatus::Partial => 'info',
-                        default => 'gray',
+                    ->color(function (RequestItem $record): string {
+                        $status = $record->payment_status;
+                        $statusClass = OptionalClass::resolve('Modules\\Billing\\Enums\\InvoiceLineStatus', 'Billing');
+
+                        if ($statusClass !== null) {
+                            return match ($status) {
+                                $statusClass::Paid => 'success',
+                                $statusClass::Unpaid => 'warning',
+                                $statusClass::Partial => 'info',
+                                default => 'gray',
+                            };
+                        }
+
+                        $value = is_object($status) && property_exists($status, 'value')
+                            ? $status->value
+                            : (string) $status;
+
+                        return match ($value) {
+                            'paid' => 'success',
+                            'unpaid' => 'warning',
+                            'partial' => 'info',
+                            default => 'gray',
+                        };
                     }),
                 TextColumn::make('fulfillment_status')
                     ->label(__('Status'))

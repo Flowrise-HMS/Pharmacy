@@ -13,12 +13,12 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Fieldset;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Modules\Billing\Models\InvoiceLine;
 use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Models\Encounter;
 use Modules\Clinical\Models\RequestItem;
 use Modules\Core\Models\Service;
 use Modules\Core\Models\Unit;
+use Modules\Core\Support\OptionalClass;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
@@ -286,11 +286,15 @@ class MedicationOrderAction
 
                     if ($request && $request->items->isNotEmpty()) {
                         $itemIds = $request->items?->pluck('id')?->toArray() ?? [];
-                        $invoiceLines = InvoiceLine::where('billable_type', (new RequestItem)->getMorphClass())
-                            ->whereIn('billable_id', $itemIds)
-                            ->get();
+                        $invoiceLines = OptionalClass::when(
+                            'Modules\\Billing\\Models\\InvoiceLine',
+                            fn (string $class) => $class::where('billable_type', (new RequestItem)->getMorphClass())
+                                ->whereIn('billable_id', $itemIds)
+                                ->get(),
+                            'Billing',
+                        );
 
-                        if ($invoiceLines->isNotEmpty()) {
+                        if ($invoiceLines?->isNotEmpty()) {
                             $lines = [];
                             $totalInsurance = 0;
                             $totalPatient = 0;

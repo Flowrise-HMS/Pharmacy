@@ -16,6 +16,7 @@ use Modules\Core\Contracts\InsurancePricingResolver;
 use Modules\Core\Contracts\StockProviderContract;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
+use Modules\Core\Support\ModuleAvailability;
 use Modules\Pharmacy\Classes\Support\PharmacyPosTotals;
 use Modules\Pharmacy\Exceptions\InsufficientStockException;
 use Modules\Pharmacy\Models\Medication;
@@ -34,6 +35,8 @@ class PharmacyPosCheckoutService
 
     public function checkout(array $data): array
     {
+        $this->ensureBillingAvailable();
+
         $branchId = $data['branch_id'];
         if ($branchId === null || $branchId === '') {
             throw new \InvalidArgumentException('Branch is required for POS checkout.');
@@ -257,6 +260,8 @@ class PharmacyPosCheckoutService
 
     public function checkoutChargeToAccount(array $data): array
     {
+        $this->ensureBillingAvailable();
+
         $branchId = $data['branch_id'];
         if ($branchId === null || $branchId === '') {
             throw new \InvalidArgumentException('Branch is required for POS checkout.');
@@ -505,5 +510,12 @@ class PharmacyPosCheckoutService
         $out[$n - 1] = $last;
 
         return $out;
+    }
+
+    protected function ensureBillingAvailable(): void
+    {
+        if (! ModuleAvailability::billingEnabled()) {
+            throw new \RuntimeException('Billing module is required for pharmacy POS checkout.');
+        }
     }
 }
