@@ -105,9 +105,7 @@ class MedicationOrderService
         $itemData = $this->normalizePrnAndFrequency($itemData);
         $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $administerInFacility = filter_var($itemData['administer_in_facility'] ?? false, FILTER_VALIDATE_BOOLEAN);
-        $context = isset($itemData['administration_context'])
-            ? AdministrationContext::tryFrom($itemData['administration_context'])
-            : null;
+        $context = enum_try_from(AdministrationContext::class, $itemData['administration_context'] ?? null);
 
         $context ??= $this->fulfillmentPolicy->defaultAdministrationContext(
             $encounter,
@@ -160,10 +158,7 @@ class MedicationOrderService
      */
     public function normalizePrnAndFrequency(array $itemData): array
     {
-        $frequency = $itemData['frequency'] ?? null;
-        $frequencyEnum = $frequency instanceof MedicationFrequency
-            ? $frequency
-            : (is_string($frequency) ? MedicationFrequency::tryFrom($frequency) : null);
+        $frequencyEnum = enum_try_from(MedicationFrequency::class, $itemData['frequency'] ?? null);
 
         $isPrn = filter_var($itemData['prn'] ?? false, FILTER_VALIDATE_BOOLEAN)
             || $frequencyEnum === MedicationFrequency::PRN;
@@ -186,9 +181,7 @@ class MedicationOrderService
      */
     public function convertMistakenPrnToScheduledCourse(PrescriptionDetail $detail): PrescriptionDetail
     {
-        $frequency = $detail->frequency instanceof MedicationFrequency
-            ? $detail->frequency
-            : (is_string($detail->frequency) ? MedicationFrequency::tryFrom($detail->frequency) : null);
+        $frequency = enum_try_from(MedicationFrequency::class, $detail->frequency);
 
         if ($frequency === null || $frequency === MedicationFrequency::PRN) {
             throw new \InvalidArgumentException('Only fixed-frequency orders can be converted from mistaken PRN.');

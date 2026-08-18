@@ -711,7 +711,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ])->values()->toArray(),
                 'payment_method' => OptionalClass::when(
                     'Modules\\Billing\\Enums\\PaymentMethod',
-                    fn (string $class) => $class::from($this->paymentMethod),
+                    fn (string $class) => enum_from($class, $this->paymentMethod),
                     'Billing',
                 ) ?? $this->paymentMethod,
                 'pos_discount_amount' => $discountStr,

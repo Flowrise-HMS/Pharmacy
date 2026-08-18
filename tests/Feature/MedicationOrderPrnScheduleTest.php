@@ -67,6 +67,21 @@ class MedicationOrderPrnScheduleTest extends TestCase
         $this->assertNull($detail->total_administrations);
     }
 
+    public function test_create_prescription_detail_accepts_administration_context_enum(): void
+    {
+        [$item, $encounter] = $this->seedRequestItem();
+
+        $detail = app(MedicationOrderService::class)->createPrescriptionDetail($item, [
+            'frequency' => MedicationFrequency::QD->value,
+            'duration_days' => 1,
+            'route' => 'po',
+            'dose_amount' => 1,
+            'administration_context' => AdministrationContext::IN_FACILITY,
+        ], $encounter);
+
+        $this->assertSame(AdministrationContext::IN_FACILITY, $detail->administration_context);
+    }
+
     public function test_convert_mistaken_prn_to_scheduled_course_recomputes_total(): void
     {
         [$item] = $this->seedRequestItem();

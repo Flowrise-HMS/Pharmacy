@@ -132,8 +132,15 @@ class PrescriptionSigFormatter
             return null;
         }
 
-        return MedicationFrequency::tryFrom((string) $detail->frequency)?->getLabel()
-            ?? strtoupper((string) $detail->frequency);
+        $frequency = enum_try_from(MedicationFrequency::class, $detail->frequency);
+
+        if ($frequency !== null) {
+            return $frequency->getLabel();
+        }
+
+        $raw = $detail->frequency instanceof \BackedEnum ? $detail->frequency->value : $detail->frequency;
+
+        return is_string($raw) && $raw !== '' ? strtoupper($raw) : null;
     }
 
     protected function routeLabel(PrescriptionDetail $detail): ?string
@@ -142,7 +149,14 @@ class PrescriptionSigFormatter
             return null;
         }
 
-        return MedicationRoute::tryFrom((string) $detail->route)?->getLabel()
-            ?? strtoupper((string) $detail->route);
+        $route = enum_try_from(MedicationRoute::class, $detail->route);
+
+        if ($route !== null) {
+            return $route->getLabel();
+        }
+
+        $raw = $detail->route instanceof \BackedEnum ? $detail->route->value : $detail->route;
+
+        return is_string($raw) && $raw !== '' ? strtoupper($raw) : null;
     }
 }

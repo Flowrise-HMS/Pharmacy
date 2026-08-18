@@ -125,15 +125,7 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
 
     protected function normalizeFrequency(MedicationFrequency|string|null $frequency): ?MedicationFrequency
     {
-        if ($frequency instanceof MedicationFrequency) {
-            return $frequency;
-        }
-
-        if (! is_string($frequency) || $frequency === '') {
-            return null;
-        }
-
-        return MedicationFrequency::tryFrom($frequency);
+        return enum_try_from(MedicationFrequency::class, $frequency);
     }
 
     /**
