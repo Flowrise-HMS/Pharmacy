@@ -88,13 +88,59 @@ class MedicationOrderService
 
             $encounter = $encounterId ? Encounter::find($encounterId) : null;
 
-            foreach ($request->items as $index => $item) {
-                $itemData = $items[$index] ?? [];
+            foreach ($this->pairInputToPersistedItems($items, $request) as [$item, $itemData]) {
                 $this->createPrescriptionDetail($item, $itemData, $encounter);
             }
 
             return $request;
         });
+    }
+
+    /**
+     * Pair each input row with the RequestItem that was persisted from it.
+     *
+     * ServiceRequest::items() is an unordered HasMany and request_items has no
+     * sequence column, so `$request->items` comes back in whatever order the
+     * driver returns — under UUID primary keys that is effectively random on
+     * MySQL. Pairing by array position therefore risked writing drug A's dosage,
+     * frequency, route and duration onto drug B. Match on service_id instead,
+     * consuming each persisted row so repeated services still pair 1:1 in the
+     * order they were submitted.
+     *
+     * @param  array<int,array<string,mixed>>  $items
+     * @return list<array{0:RequestItem,1:array<string,mixed>}>
+     */
+    protected function pairInputToPersistedItems(array $items, ServiceRequest $request): array
+    {
+        $pending = $request->items->all();
+        $paired = [];
+
+        foreach ($items as $itemData) {
+            $serviceId = (string) ($itemData['service_id'] ?? '');
+            $matchedKey = null;
+
+            foreach ($pending as $key => $candidate) {
+                if ((string) $candidate->service_id === $serviceId) {
+                    $matchedKey = $key;
+                    break;
+                }
+            }
+
+            if ($matchedKey === null) {
+                // Fail closed: a prescription whose directions cannot be traced
+                // back to the row the clinician filled in must not be persisted.
+                throw new \RuntimeException(sprintf(
+                    'Ordered service %s has no matching request item on service request %s.',
+                    $serviceId,
+                    $request->id,
+                ));
+            }
+
+            $paired[] = [$pending[$matchedKey], $itemData];
+            unset($pending[$matchedKey]);
+        }
+
+        return $paired;
     }
 
     /**
