@@ -92,7 +92,15 @@ class DispenseApiTest extends TestCase
         $response->assertJsonPath('data.branch_id', $this->branchA->id);
     }
 
-    public function test_branch_id_can_be_updated_via_api(): void
+    /**
+     * This previously asserted the opposite — that a caller could set `branch_id`
+     * through the update body — which pinned a cross-branch write in place: a user
+     * in branch A could move a dispense record into branch B, after which the read
+     * side's global scope made it invisible to them.
+     *
+     * Branch is owned by SetCurrentApiBranch and is never accepted from the request.
+     */
+    public function test_branch_id_cannot_be_changed_via_api(): void
     {
         $user = User::factory()->create(['branch_id' => $this->branchA->id]);
         $user->givePermissionTo(['View Dispense', 'Update Dispense']);
@@ -103,14 +111,16 @@ class DispenseApiTest extends TestCase
 
         $response = $this->actingAs($user)->putJson("/api/v1/dispenses/{$dispense->id}", [
             'branch_id' => $this->branchB->id,
+            'notes' => 'Updated note.',
         ]);
 
         $response->assertSuccessful();
-        $response->assertJsonPath('data.branch_id', $this->branchB->id);
+        $response->assertJsonPath('data.branch_id', $this->branchA->id);
 
         $this->assertDatabaseHas('dispenses', [
             'id' => $dispense->id,
-            'branch_id' => $this->branchB->id,
+            'branch_id' => $this->branchA->id,
+            'notes' => 'Updated note.',
         ]);
     }
 }

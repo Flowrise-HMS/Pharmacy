@@ -45,8 +45,13 @@ class DispenseController extends ApiController
 
         $this->authorizeApi('update', $dispense);
 
+        /*
+         * `branch_id` is deliberately not accepted. It used to be, which let a
+         * caller in branch A move a dispense record into branch B — a cross-branch
+         * write that the read-side global scope then made invisible to them.
+         * Branch is owned by SetCurrentApiBranch, never by the request body.
+         */
         $validated = $request->validate([
-            'branch_id' => ['sometimes', 'required', 'uuid', 'exists:branches,id'],
             'batch_number' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
             'quantity' => ['sometimes', 'integer', 'min:0'],
