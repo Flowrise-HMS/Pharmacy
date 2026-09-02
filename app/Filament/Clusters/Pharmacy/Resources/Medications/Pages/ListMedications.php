@@ -11,10 +11,12 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Utilities\Set;
 use Modules\Core\Classes\Services\BranchService;
+use Modules\Core\Filament\Support\SuperAdminExportAction;
 use Modules\Core\Models\Branch;
 use Modules\Pharmacy\Classes\Services\DrugMaterializationService;
 use Modules\Pharmacy\Classes\Services\DrugSearchService;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\MedicationResource;
+use Modules\Pharmacy\Filament\Exports\MedicationExporter;
 use Modules\Pharmacy\Filament\Imports\MedicationImporter;
 use Modules\Pharmacy\Models\Drug;
 
@@ -25,6 +27,7 @@ class ListMedications extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            SuperAdminExportAction::make(MedicationExporter::class),
             Action::make('create_from_drug')
                 ->label('Create from Drug')
                 ->icon('heroicon-m-magnifying-glass')
