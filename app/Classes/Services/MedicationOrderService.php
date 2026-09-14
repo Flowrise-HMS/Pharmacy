@@ -188,6 +188,11 @@ class MedicationOrderService
             'administer_in_facility_flag' => $administerInFacility,
         ]);
 
+        // The item was hydrated before its detail existed; attach it so the
+        // schedule sync does not lazy load (and trip strict mode) on a
+        // relation that was legitimately empty a moment ago.
+        $item->setRelation('prescriptionDetail', $detail);
+
         $this->doseScheduleService->syncNextDoseAt($item);
 
         $medication = Medication::where('service_id', $item->service_id)->first();
