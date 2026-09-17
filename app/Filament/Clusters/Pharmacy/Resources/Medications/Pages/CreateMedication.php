@@ -3,6 +3,7 @@
 namespace Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Pages;
 
 use Filament\Resources\Pages\CreateRecord;
+use Modules\Pharmacy\Classes\Services\DrugMedicationResolver;
 use Modules\Pharmacy\Classes\Services\MedicationService;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\MedicationResource;
 use Modules\Pharmacy\Models\Drug;
@@ -37,7 +38,12 @@ class CreateMedication extends CreateRecord
             $drug = Drug::query()->find($payload['drug_id']);
 
             if ($drug) {
-                return $service->createFromDrug($drug, $payload);
+                // The drug may already have been materialized by a clinician
+                // prescribing it; resolve to that row instead of duplicating.
+                $medication = app(DrugMedicationResolver::class)->resolve($drug, $payload);
+                $medication->forceFill(['is_formulary' => true])->save();
+
+                return $medication;
             }
         }
 

@@ -11,6 +11,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Medications\Schemas\MedicationForm;
@@ -24,7 +25,14 @@ class MedicationsTable
         return $table
             ->modifyQueryUsing(fn ($query) => $query
                 ->withSum('stockItems', 'quantity_on_hand')
-                ->with(['stockUnit']))
+                ->with(['stockUnit', 'service']))
+            ->filters([
+                TernaryFilter::make('is_formulary')
+                    ->label('Formulary')
+                    ->placeholder('All medications')
+                    ->trueLabel('In formulary')
+                    ->falseLabel('Needs pricing'),
+            ])
             ->columns([
                 TextColumn::make('#')->rowIndex(),
                 TextColumn::make('display_name')
@@ -50,12 +58,12 @@ class MedicationsTable
                 TextColumn::make('billing_status')
                     ->label('Billing')
                     ->badge()
-                    ->state(fn (Medication $record): string => $record->billingService()
-                        ? ((float) $record->billingService()->price > 0 ? 'Priced' : 'Zero price')
-                        : 'No billing')
-                    ->color(fn (Medication $record): string => $record->billingService()
-                        ? ((float) $record->billingService()->price > 0 ? 'success' : 'info')
-                        : 'warning'),
+                    ->state(fn (Medication $record): string => self::billingStatus($record))
+                    ->color(fn (Medication $record): string => match (self::billingStatus($record)) {
+                        'Priced' => 'success',
+                        'Zero price' => 'info',
+                        default => 'warning',
+                    }),
                 TextColumn::make('controlled_schedule')->badge(),
                 TextColumn::make('is_active')
                     ->badge()
@@ -99,5 +107,24 @@ class MedicationsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * "Needs pricing" wins over the price-derived states: a clinician-created
+     * row is unreviewed regardless of what its placeholder service says.
+     */
+    protected static function billingStatus(Medication $record): string
+    {
+        if (! $record->is_formulary) {
+            return 'Needs pricing';
+        }
+
+        $service = $record->billingService();
+
+        if (! $service) {
+            return 'No billing';
+        }
+
+        return (float) $service->price > 0 ? 'Priced' : 'Zero price';
     }
 }

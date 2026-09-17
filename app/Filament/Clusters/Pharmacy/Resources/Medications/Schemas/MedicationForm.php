@@ -20,6 +20,7 @@ use Modules\Pharmacy\Classes\Services\MedicationService;
 use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Models\Drug;
+use Modules\Pharmacy\Models\Medication;
 
 class MedicationForm
 {
@@ -71,6 +72,11 @@ class MedicationForm
                         ->all();
                 })
                 ->getOptionLabelUsing(fn ($value): ?string => Drug::query()->find($value)?->display_name)
+                ->afterStateHydrated(function (Select $component, ?Medication $record): void {
+                    if ($record?->drug_id) {
+                        $component->state($record->drug_id);
+                    }
+                })
                 ->afterStateUpdated(function ($state, Set $set): void {
                     $drug = filled($state) ? Drug::query()->find($state) : null;
 
@@ -91,7 +97,11 @@ class MedicationForm
                         $set('dosage_form', app(MedicationService::class)->resolveDosageForm($drug->dosage_form_text));
                     }
                 }),
-            Hidden::make('drug_id'),
+            Hidden::make('drug_id')
+                ->unique(table: Medication::class, column: 'drug_id', ignoreRecord: true)
+                ->validationMessages([
+                    'unique' => __('This drug is already in the catalog. Edit the existing medication instead.'),
+                ]),
             Select::make('service_id')
                 ->label(__('Billing service'))
                 ->relationship(
@@ -162,10 +172,17 @@ class MedicationForm
                         ->label(__('NDC code'))
                         ->maxLength(50),
                 ]),
-            Toggle::make('is_active')
-                ->label(__('Active'))
-                ->default(true)
-                ->required(),
+            Grid::make(2)
+                ->schema([
+                    Toggle::make('is_active')
+                        ->label(__('Active'))
+                        ->default(true)
+                        ->required(),
+                    Toggle::make('is_formulary')
+                        ->label(__('In formulary'))
+                        ->helperText(__('Off means a clinician added this by prescribing it and Pharmacy has not priced it yet.'))
+                        ->default(true),
+                ]),
         ];
     }
 

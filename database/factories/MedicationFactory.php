@@ -16,6 +16,7 @@ class MedicationFactory extends Factory
     {
         return [
             'service_id' => Service::factory(),
+            'drug_id' => null,
             'rxnorm_code' => (string) fake()->numberBetween(100000, 999999),
             'ndc_code' => fake()->numerify('#####-####-##'),
             'generic_name' => fake()->word().' '.fake()->word(),
@@ -24,10 +25,16 @@ class MedicationFactory extends Factory
             'strength' => fake()->randomElement(['250mg', '500mg', '5mg/5ml', '10mg']),
             'controlled_schedule' => null,
             'is_active' => true,
+            'is_formulary' => true,
             'stock_unit_id' => Unit::factory(),
             'billing_unit_id' => Unit::factory(),
             'dose_unit_id' => Unit::factory(),
             'units_per_stock_unit' => null,
         ];
+    }
+
+    public function nonFormulary(): static
+    {
+        return $this->state(fn (): array => ['is_formulary' => false]);
     }
 }

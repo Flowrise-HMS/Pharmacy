@@ -13,6 +13,7 @@ use Modules\Pharmacy\Console\BackfillMedicationBillingServicesCommand;
 use Modules\Pharmacy\Console\BackfillMedicationUnitsCommand;
 use Modules\Pharmacy\Console\BackfillPrescriptionDetailsCommand;
 use Modules\Pharmacy\Console\ImportFDANdcDrugData;
+use Modules\Pharmacy\Console\MergeDuplicateMedicationsCommand;
 use Modules\Pharmacy\Models\Dispense;
 use Modules\Pharmacy\Models\PrescriptionDetail;
 use Nwidart\Modules\Support\ModuleServiceProvider;
@@ -63,6 +64,7 @@ class PharmacyServiceProvider extends ModuleServiceProvider
             BackfillMedicationBillingServicesCommand::class,
             BackfillMedicationUnitsCommand::class,
             BackfillPrescriptionDetailsCommand::class,
+            MergeDuplicateMedicationsCommand::class,
         ]);
     }
 }

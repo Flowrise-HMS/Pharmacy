@@ -7,16 +7,35 @@ use Modules\Pharmacy\Models\Drug;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
 
+/**
+ * Pharmacy's "Create from Drug" flow: adopt a reference drug into the
+ * formulary with a price, billing flags and optional opening stock. When a
+ * clinician already materialized the drug by prescribing it, this prices and
+ * promotes that existing row instead of creating a second one.
+ */
 class DrugMaterializationService
 {
     public function __construct(
-        protected MedicationService $medicationService
+        protected DrugMedicationResolver $resolver,
+        protected MedicationService $medicationService,
+        protected MedicationBillingSyncService $billingSyncService,
     ) {}
 
     public function materialize(Drug $drug, array $data = []): Medication
     {
-        $medication = $this->findExistingMedication($drug)
-            ?? $this->medicationService->createFromDrug($drug, $data);
+        $medication = $this->resolver->resolve($drug, $data);
+
+        if (! $medication->wasRecentlyCreated) {
+            $this->billingSyncService->ensureBillingService($medication, Arr::only($data, [
+                'service_name',
+                'service_description',
+                'price',
+                'requires_prescription',
+                'requires_payment_before',
+            ]));
+        }
+
+        $medication->forceFill(['is_formulary' => true])->save();
 
         $this->applyInitialStock($medication, $data);
 
@@ -25,14 +44,6 @@ class DrugMaterializationService
         }
 
         return $medication->fresh(['service']);
-    }
-
-    protected function findExistingMedication(Drug $drug): ?Medication
-    {
-        return Medication::query()
-            ->when(filled($drug->rxnorm_code), fn ($query) => $query->orWhere('rxnorm_code', $drug->rxnorm_code))
-            ->when(filled($drug->ndc_code), fn ($query) => $query->orWhere('ndc_code', $drug->ndc_code))
-            ->first();
     }
 
     protected function applyInitialStock(Medication $medication, array $data): void

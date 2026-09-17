@@ -5,6 +5,7 @@ namespace Modules\Pharmacy\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Pharmacy\Database\Factories\DrugFactory;
 
 class Drug extends Model
@@ -45,5 +46,13 @@ class Drug extends Model
     protected static function newFactory(): DrugFactory
     {
         return DrugFactory::new();
+    }
+
+    /**
+     * The formulary row materialized from this reference drug, if any.
+     */
+    public function medication(): HasOne
+    {
+        return $this->hasOne(Medication::class);
     }
 }

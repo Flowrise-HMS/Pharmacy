@@ -27,6 +27,23 @@ class MedicationResource extends Resource
 
     protected static ?string $cluster = PharmacyCluster::class;
 
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Medications waiting for Pharmacy to price';
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $needsPricing = Medication::query()->nonFormulary()->count();
+
+        return $needsPricing > 0 ? (string) $needsPricing : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'warning';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return MedicationForm::configure($schema);

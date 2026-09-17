@@ -3,6 +3,7 @@
 namespace Modules\Pharmacy\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +26,7 @@ class Medication extends Model
 
     protected $fillable = [
         'service_id',
+        'drug_id',
         'rxnorm_code',
         'ndc_code',
         'generic_name',
@@ -33,6 +35,7 @@ class Medication extends Model
         'strength',
         'controlled_schedule',
         'is_active',
+        'is_formulary',
         'stock_unit_id',
         'billing_unit_id',
         'dose_unit_id',
@@ -43,7 +46,12 @@ class Medication extends Model
         'dosage_form' => DosageForm::class,
         'controlled_schedule' => ControlledSchedule::class,
         'is_active' => 'boolean',
+        'is_formulary' => 'boolean',
         'units_per_stock_unit' => 'decimal:4',
+    ];
+
+    protected $attributes = [
+        'is_formulary' => true,
     ];
 
     protected static function newFactory(): MedicationFactory
@@ -54,6 +62,27 @@ class Medication extends Model
     public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function drug(): BelongsTo
+    {
+        return $this->belongsTo(Drug::class);
+    }
+
+    /**
+     * Rows Pharmacy has reviewed and priced.
+     */
+    public function scopeFormulary(Builder $query): Builder
+    {
+        return $query->where('is_formulary', true);
+    }
+
+    /**
+     * Rows created by prescribing a reference drug; still need Pharmacy review.
+     */
+    public function scopeNonFormulary(Builder $query): Builder
+    {
+        return $query->where('is_formulary', false);
     }
 
     public function displayName(): string

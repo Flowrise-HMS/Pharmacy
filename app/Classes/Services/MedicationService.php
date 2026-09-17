@@ -40,7 +40,6 @@ class MedicationService
     {
         return [
             'drug_reference_id',
-            'drug_id',
         ];
     }
 
@@ -95,6 +94,8 @@ class MedicationService
     public function createFromDrug(Drug $drug, array $data = []): Medication
     {
         return $this->createWithService([
+            'drug_id' => Arr::get($data, 'drug_id', $drug->id),
+            'is_formulary' => Arr::get($data, 'is_formulary', true),
             'rxnorm_code' => Arr::get($data, 'rxnorm_code', $drug->rxnorm_code),
             'ndc_code' => Arr::get($data, 'ndc_code', $drug->ndc_code),
             'generic_name' => Arr::get($data, 'generic_name', $drug->generic_name),

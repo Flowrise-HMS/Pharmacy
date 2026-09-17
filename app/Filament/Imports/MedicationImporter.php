@@ -101,7 +101,14 @@ class MedicationImporter extends Importer
             ])->increment('quantity_on_hand', (int) $data['initial_stock_quantity']);
         }
 
-        $this->upsertDrugReference($data);
+        $drug = $this->upsertDrugReference($data);
+
+        // Link the imported row to its reference drug so the formulary and the
+        // reference catalog stay one-to-one; a drug already claimed elsewhere
+        // is left alone rather than tripping the unique constraint.
+        if ($drug && $this->record->drug_id === null && ! $drug->medication()->exists()) {
+            $this->record->forceFill(['drug_id' => $drug->id])->saveQuietly();
+        }
     }
 
     public static function getCompletedNotificationBody(Import $import): string
@@ -115,13 +122,13 @@ class MedicationImporter extends Importer
         return $body;
     }
 
-    protected function upsertDrugReference(array $data): void
+    protected function upsertDrugReference(array $data): ?Drug
     {
         if (blank($data['generic_name'] ?? null)) {
-            return;
+            return null;
         }
 
-        Drug::query()->updateOrCreate(
+        return Drug::query()->updateOrCreate(
             [
                 'source_provider' => 'local',
                 'source_identifier' => $this->resolveDrugSourceIdentifier($data),

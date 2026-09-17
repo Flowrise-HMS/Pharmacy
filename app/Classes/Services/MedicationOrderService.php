@@ -35,28 +35,10 @@ class MedicationOrderService
      */
     public function order(Patient|array $patientOrGuest, array $items, User $orderedBy, ?string $encounterId = null): ?ServiceRequest
     {
-        foreach ($items as &$item) {
-            if (str_starts_with($item['service_id'], 'drug:')) {
-                $drugId = str($item['service_id'])->after('drug:')->toString();
-                $drug = Drug::findOrFail($drugId);
-                $medication = app(MedicationService::class)->createFromDrug($drug, $item);
-                $item['service_id'] = $medication->service_id;
-            } elseif (str_starts_with($item['service_id'], 'medication:')) {
-                $medId = str($item['service_id'])->after('medication:')->toString();
-                $medication = Medication::findOrFail($medId);
-                if (! $medication->service_id) {
-                    app(MedicationBillingSyncService::class)->ensureBillingService($medication, []);
-                    $medication->refresh();
-                }
-                $item['service_id'] = $medication->service_id;
-            }
-        }
-        unset($item);
-
+        // Authorize before touching the catalog: a denied order must not leave
+        // a freshly materialized Medication + Service behind.
         foreach ($items as $item) {
-            $service = Service::findOrFail($item['service_id']);
-
-            if ($service->requires_prescription && ! $this->canOrderPrescription($orderedBy, $service)) {
+            if ($this->itemRequiresPrescription($item) && ! $this->canOrderPrescription($orderedBy)) {
                 Notification::make()
                     ->title('You cannot order prescription required medications.')
                     ->danger()
@@ -69,7 +51,11 @@ class MedicationOrderService
             }
         }
 
-        return DB::transaction(function () use ($patientOrGuest, $items, $orderedBy, $encounterId) {
+        $prescribedDrugIds = [];
+
+        $request = DB::transaction(function () use ($patientOrGuest, $items, $orderedBy, $encounterId, &$prescribedDrugIds) {
+            $items = $this->resolveCatalogReferences($items, $prescribedDrugIds);
+
             $request = $patientOrGuest instanceof Patient
                 ? $this->serviceRequestService->createForPatient(
                     patient: $patientOrGuest,
@@ -94,6 +80,74 @@ class MedicationOrderService
 
             return $request;
         });
+
+        // Only count an order that actually persisted, so failed orders do not
+        // inflate a drug's search rank.
+        if ($prescribedDrugIds !== []) {
+            Drug::query()->whereIn('id', $prescribedDrugIds)->increment('times_prescribed');
+        }
+
+        return $request;
+    }
+
+    /**
+     * Turn the tagged select values (`drug:<id>`, `medication:<id>`) into the
+     * billing service id the request items need. A reference drug resolves to
+     * its single Medication, creating a non-formulary one only when none exists.
+     *
+     * @param  array<int,array<string,mixed>>  $items
+     * @param  list<string>  $prescribedDrugIds
+     * @return array<int,array<string,mixed>>
+     */
+    protected function resolveCatalogReferences(array $items, array &$prescribedDrugIds): array
+    {
+        foreach ($items as &$item) {
+            $serviceId = (string) $item['service_id'];
+
+            if (str_starts_with($serviceId, 'drug:')) {
+                $drug = Drug::findOrFail(str($serviceId)->after('drug:')->toString());
+                $medication = app(DrugMedicationResolver::class)->resolve($drug);
+                $item['service_id'] = $medication->service_id;
+                $prescribedDrugIds[] = $drug->id;
+            } elseif (str_starts_with($serviceId, 'medication:')) {
+                $medication = Medication::findOrFail(str($serviceId)->after('medication:')->toString());
+                if (! $medication->service_id) {
+                    app(MedicationBillingSyncService::class)->ensureBillingService($medication, []);
+                    $medication->refresh();
+                }
+                $item['service_id'] = $medication->service_id;
+            }
+        }
+        unset($item);
+
+        return $items;
+    }
+
+    /**
+     * Decide the prescription requirement without materializing anything. A
+     * reference drug that has no Medication yet will be created as
+     * prescription-only, so treat it that way here.
+     *
+     * @param  array<string,mixed>  $item
+     */
+    protected function itemRequiresPrescription(array $item): bool
+    {
+        $serviceId = (string) $item['service_id'];
+
+        if (str_starts_with($serviceId, 'drug:')) {
+            $drug = Drug::findOrFail(str($serviceId)->after('drug:')->toString());
+            $medication = app(DrugMedicationResolver::class)->findExisting($drug);
+
+            return $medication?->service?->requires_prescription ?? true;
+        }
+
+        if (str_starts_with($serviceId, 'medication:')) {
+            $medication = Medication::findOrFail(str($serviceId)->after('medication:')->toString());
+
+            return (bool) $medication->service?->requires_prescription;
+        }
+
+        return (bool) Service::findOrFail($serviceId)->requires_prescription;
     }
 
     /**
@@ -286,7 +340,7 @@ class MedicationOrderService
         ]);
     }
 
-    protected function canOrderPrescription(User $user, Service $service): bool
+    protected function canOrderPrescription(User $user): bool
     {
         return $user->can('order_prescription_medication');
     }

@@ -16,20 +16,16 @@ use Illuminate\Support\Facades\Log;
 use Modules\Clinical\Classes\Services\MedicationFulfillmentPolicy;
 use Modules\Clinical\Models\Encounter;
 use Modules\Clinical\Models\RequestItem;
-use Modules\Core\Models\Service;
 use Modules\Core\Models\Unit;
 use Modules\Core\Support\OptionalClass;
 use Modules\Patient\Models\Patient;
-use Modules\Pharmacy\Classes\Services\DrugSearchService;
-use Modules\Pharmacy\Classes\Services\MedicationBillingSyncService;
 use Modules\Pharmacy\Classes\Services\MedicationOrderService;
+use Modules\Pharmacy\Classes\Services\MedicationSearchOptionFormatter;
 use Modules\Pharmacy\Classes\Services\MedicationService;
 use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Enums\DosageForm;
 use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Enums\MedicationRoute;
-use Modules\Pharmacy\Models\Drug;
-use Modules\Pharmacy\Models\Medication;
 
 class MedicationOrderAction
 {
@@ -50,56 +46,11 @@ class MedicationOrderAction
                             ->required()
                             ->searchable()
                             ->live()
-                            ->getSearchResultsUsing(function (string $search) {
-                                return collect(app(DrugSearchService::class)->search($search, 10))
-                                    ->mapWithKeys(function (array $result): array {
-                                        if (filled($result['service_id'])) {
-                                            return [
-                                                (string) $result['service_id'] => '[Catalog] '.$result['display_name'],
-                                            ];
-                                        }
-
-                                        if (filled($result['drug_id'])) {
-                                            $prefix = $result['source_provider'] === 'local' ? '[Reference] ' : '[External] ';
-
-                                            return [
-                                                'drug:'.$result['drug_id'] => $prefix.$result['display_name'],
-                                            ];
-                                        }
-
-                                        if (filled($result['medication_id'])) {
-                                            return [
-                                                'medication:'.$result['medication_id'] => $result['display_name'],
-                                            ];
-                                        }
-
-                                        return [];
-                                    })
-                                    ->all();
-                            })
-                            ->getOptionLabelUsing(function ($value): ?string {
-                                if (str_starts_with($value, 'drug:')) {
-                                    $drugId = str($value)->after('drug:')->toString();
-                                    $drug = Drug::query()->find($drugId);
-
-                                    if (! $drug) {
-                                        return $value;
-                                    }
-
-                                    $prefix = $drug->source_provider === 'local' ? '[Reference] ' : '[External] ';
-
-                                    return $prefix.$drug->display_name;
-                                }
-
-                                if (str_starts_with($value, 'medication:')) {
-                                    $medicationId = str($value)->after('medication:')->toString();
-                                    $medication = Medication::find($medicationId);
-
-                                    return $medication?->service?->name ?? $medication?->generic_name ?? $value;
-                                }
-
-                                return Service::find($value)?->name;
-                            })
+                            ->allowHtml()
+                            ->getSearchResultsUsing(fn (string $search): array => app(MedicationSearchOptionFormatter::class)
+                                ->searchOptions($search, self::resolveBranchId($patient, $encounterId), 10))
+                            ->getOptionLabelUsing(fn ($value): ?string => app(MedicationSearchOptionFormatter::class)
+                                ->optionLabel((string) $value, self::resolveBranchId($patient, $encounterId)))
                             ->preload()
                             ->createOptionForm([
                                 TextInput::make('generic_name')
@@ -121,7 +72,10 @@ class MedicationOrderAction
                                     ->default(0),
                             ])
                             ->createOptionUsing(function (array $data): string {
-                                return app(MedicationService::class)->createWithService($data)->service_id;
+                                // Ad-hoc rows land in Pharmacy's "needs pricing" queue.
+                                return app(MedicationService::class)
+                                    ->createWithService($data + ['is_formulary' => false])
+                                    ->service_id;
                             }),
                         TextInput::make('quantity')
                             ->label('Quantity to bill/dispense')
@@ -260,24 +214,6 @@ class MedicationOrderAction
                 $user = Auth::user();
 
                 try {
-                    foreach ($data['items'] as &$item) {
-                        if (str_starts_with($item['service_id'], 'drug:')) {
-                            $drugId = str($item['service_id'])->after('drug:')->toString();
-                            $drug = Drug::findOrFail($drugId);
-                            $medication = app(MedicationService::class)->createFromDrug($drug, $item);
-                            $item['service_id'] = $medication->service_id;
-                        } elseif (str_starts_with($item['service_id'], 'medication:')) {
-                            $medId = str($item['service_id'])->after('medication:')->toString();
-                            $medication = Medication::findOrFail($medId);
-                            if (! $medication->service_id) {
-                                app(MedicationBillingSyncService::class)->ensureBillingService($medication, []);
-                                $medication->refresh();
-                            }
-                            $item['service_id'] = $medication->service_id;
-                        }
-                    }
-                    unset($item);
-
                     $request = $patient ? $service->order($patient, $data['items'], $user, $encounterId)
                     : $service->order([
                         'guest_name' => $data['guest_name'] ?? 'Guest',
@@ -332,5 +268,18 @@ class MedicationOrderAction
                     Log::error($e->getMessage());
                 }
             });
+    }
+
+    /**
+     * Branch whose stock the picker should report. Never falls back to a
+     * default branch: another facility's count would read as a lie.
+     */
+    protected static function resolveBranchId(?Patient $patient, ?string $encounterId): ?string
+    {
+        $encounterBranchId = $encounterId
+            ? Encounter::query()->whereKey($encounterId)->value('branch_id')
+            : null;
+
+        return $encounterBranchId ?? $patient?->branch_id;
     }
 }
