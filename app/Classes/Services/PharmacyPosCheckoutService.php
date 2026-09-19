@@ -11,6 +11,7 @@ use Modules\Billing\Services\InvoiceAllocationBuilder;
 use Modules\Billing\Services\InvoiceIssuanceService;
 use Modules\Billing\Services\InvoiceTotalsService;
 use Modules\Billing\Services\ManualInvoiceService;
+use Modules\Billing\Services\PatientPendingChargesService;
 use Modules\Billing\Services\PaymentRecordingService;
 use Modules\Core\Contracts\InsurancePricingResolver;
 use Modules\Core\Contracts\StockProviderContract;
@@ -31,7 +32,24 @@ class PharmacyPosCheckoutService
         protected InvoiceIssuanceService $issuanceService,
         protected InvoiceAllocationBuilder $allocationBuilder,
         protected PaymentRecordingService $paymentRecordingService,
+        protected PatientPendingChargesService $pendingCharges,
     ) {}
+
+    /**
+     * Cart rows of type `charge` point at invoice lines the patient already owes for
+     * ordered services or prescriptions. They are settled on their own invoices and never
+     * produce new lines or stock movements; everything else is a walk-in sale.
+     *
+     * @param  list<array<string, mixed>>  $cart
+     * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>} [charge rows, walk-in rows]
+     */
+    public static function splitChargeRows(array $cart): array
+    {
+        $charges = array_values(array_filter($cart, fn (array $row): bool => ($row['type'] ?? 'medication') === 'charge'));
+        $walkIn = array_values(array_filter($cart, fn (array $row): bool => ($row['type'] ?? 'medication') !== 'charge'));
+
+        return [$charges, $walkIn];
+    }
 
     public function checkout(array $data): array
     {
@@ -44,7 +62,7 @@ class PharmacyPosCheckoutService
 
         $patientId = $data['patient_id'] ?? null;
         $currency = $data['currency'] ?? config('core.default_currency');
-        $cart = $data['cart'];
+        [$chargeRows, $cart] = self::splitChargeRows($data['cart']);
         $method = $data['payment_method'] ?? PaymentMethod::Cash;
         $posDiscount = PharmacyPosTotals::normalizeMoney($data['pos_discount_amount'] ?? 0);
         $amountTendered = isset($data['amount_tendered']) && $data['amount_tendered'] !== null && $data['amount_tendered'] !== ''
@@ -52,6 +70,24 @@ class PharmacyPosCheckoutService
             : null;
 
         Branch::query()->findOrFail($branchId);
+
+        if ($chargeRows === [] && $cart === []) {
+            throw new \InvalidArgumentException('The cart is empty.');
+        }
+
+        $chargeLineIds = array_values(array_filter(array_map(fn (array $row): string => (string) ($row['invoice_line_id'] ?? ''), $chargeRows)));
+
+        if ($chargeLineIds !== [] && ! $patientId) {
+            throw new \InvalidArgumentException('Select the patient before paying their pending charges.');
+        }
+
+        $chargeTotal = $chargeLineIds !== []
+            ? $this->pendingCharges->remainingFor($chargeLineIds, (string) $patientId)
+            : '0.00';
+
+        if ($chargeTotal === null) {
+            throw new \InvalidArgumentException('One of the ordered items in the cart is no longer pending payment. Remove it and try again.');
+        }
 
         $medRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'medication');
         $svcRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'service');
@@ -129,98 +165,103 @@ class PharmacyPosCheckoutService
 
         $discounts = $this->distributeDiscountAcrossLines($lineSubtotals, $posDiscount);
 
-        return DB::transaction(function () use ($branchId, $patientId, $currency, $cart, $method, $medications, $services, $medRows, $data, $discounts, $posDiscount, $amountTendered) {
-            $invoice = $this->manualInvoiceService->createStandaloneDraft(
-                branchId: $branchId,
-                patientId: $patientId,
-                currency: $currency,
-                invoiceType: InvoiceType::Standalone,
-            );
+        return DB::transaction(function () use ($branchId, $patientId, $currency, $cart, $method, $medications, $services, $medRows, $data, $discounts, $posDiscount, $amountTendered, $chargeLineIds, $chargeTotal) {
+            $invoice = null;
+            $invoiceTotal = '0.00';
 
-            if (! $patientId) {
-                $invoice->guest_name = $data['guest_name'] ?? null;
-                $invoice->guest_phone = $data['guest_phone'] ?? null;
-                $invoice->guest_email = $data['guest_email'] ?? null;
-                $invoice->save();
+            if ($cart !== []) {
+                $invoice = $this->manualInvoiceService->createStandaloneDraft(
+                    branchId: $branchId,
+                    patientId: $patientId,
+                    currency: $currency,
+                    invoiceType: InvoiceType::Standalone,
+                );
+
+                if (! $patientId) {
+                    $invoice->guest_name = $data['guest_name'] ?? null;
+                    $invoice->guest_phone = $data['guest_phone'] ?? null;
+                    $invoice->guest_email = $data['guest_email'] ?? null;
+                    $invoice->save();
+                }
+
+                foreach ($cart as $index => $row) {
+                    $isMed = ($row['type'] ?? 'medication') === 'medication';
+                    if ($isMed) {
+                        $sourceItem = $medications[$row['id']];
+                        $service = $sourceItem->service;
+                        $unitPrice = (string) ($service->price ?? '0');
+                    } else {
+                        $sourceItem = $services[$row['id']];
+                        $service = $sourceItem;
+                        $unitPrice = (string) ($sourceItem->price ?? '0');
+                    }
+
+                    $quantity = (int) $row['quantity'];
+                    $lineDiscount = $discounts[$index] ?? '0.00';
+                    $gross = bcmul($unitPrice, (string) $quantity, 2);
+                    $netBeforeTax = bcsub($gross, $lineDiscount, 2);
+                    if (bccomp($netBeforeTax, '0', 2) < 0) {
+                        throw new \InvalidArgumentException('Invalid discount for line items.');
+                    }
+
+                    $lineData = [
+                        'invoice_id' => $invoice->id,
+                        'service_id' => $service->id,
+                        'description' => $service->name ?? $sourceItem->name,
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'discount_amount' => $lineDiscount,
+                        'tax_amount' => '0',
+                        'amount_paid' => '0',
+                        'line_status' => InvoiceLineStatus::Unpaid,
+                        'patient_responsibility_amount' => $netBeforeTax,
+                        'metadata' => ['source' => 'pharmacy_pos'],
+                    ];
+
+                    if ($isMed) {
+                        $lineData['billable_type'] = $sourceItem->getMorphClass();
+                        $lineData['billable_id'] = $sourceItem->id;
+                        $lineData['unit_id'] = $sourceItem->billing_unit_id;
+                        $lineData['unit_label_snapshot'] = $sourceItem->billingUnit?->label;
+                    } else {
+                        $lineData['billable_type'] = null;
+                        $lineData['billable_id'] = null;
+                        $lineData['unit_id'] = null;
+                        $lineData['unit_label_snapshot'] = null;
+                        $lineData['metadata']['item_type'] = 'service';
+                    }
+
+                    if ($patientId) {
+                        $pricing = $this->insurancePricing->resolveForItem(
+                            patientId: $patientId,
+                            itemType: 'service',
+                            externalCode: (string) $service->id,
+                            fallbackAmount: $gross,
+                        );
+                        $lineData['insurance_expected_amount'] = $pricing['insurer_amount'];
+                        $lineData['patient_responsibility_amount'] = $pricing['patient_amount'];
+                        $lineData['metadata'] = array_merge($lineData['metadata'], [
+                            'insurance_policy_id' => $pricing['policy_id'],
+                            'insurance_payer_id' => $pricing['payer_id'],
+                            'insurance_source_version' => $pricing['source_version'],
+                        ]);
+                    }
+
+                    InvoiceLine::query()->create($lineData);
+                }
+
+                $invoice = $this->totalsService->recalculate($invoice->fresh(['lines']));
+
+                $invoice = $this->issuanceService->issue($invoice->fresh(['lines']));
+
+                $invoiceTotal = (string) $invoice->total;
             }
 
-            foreach ($cart as $index => $row) {
-                $isMed = ($row['type'] ?? 'medication') === 'medication';
-                if ($isMed) {
-                    $sourceItem = $medications[$row['id']];
-                    $service = $sourceItem->service;
-                    $unitPrice = (string) ($service->price ?? '0');
-                } else {
-                    $sourceItem = $services[$row['id']];
-                    $service = $sourceItem;
-                    $unitPrice = (string) ($sourceItem->price ?? '0');
-                }
+            $grandTotal = bcadd($chargeTotal, $invoiceTotal, 2);
 
-                $quantity = (int) $row['quantity'];
-                $lineDiscount = $discounts[$index] ?? '0.00';
-                $gross = bcmul($unitPrice, (string) $quantity, 2);
-                $netBeforeTax = bcsub($gross, $lineDiscount, 2);
-                if (bccomp($netBeforeTax, '0', 2) < 0) {
-                    throw new \InvalidArgumentException('Invalid discount for line items.');
-                }
-
-                $lineData = [
-                    'invoice_id' => $invoice->id,
-                    'service_id' => $service->id,
-                    'description' => $service->name ?? $sourceItem->name,
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'discount_amount' => $lineDiscount,
-                    'tax_amount' => '0',
-                    'amount_paid' => '0',
-                    'line_status' => InvoiceLineStatus::Unpaid,
-                    'patient_responsibility_amount' => $netBeforeTax,
-                    'metadata' => ['source' => 'pharmacy_pos'],
-                ];
-
-                if ($isMed) {
-                    $lineData['billable_type'] = $sourceItem->getMorphClass();
-                    $lineData['billable_id'] = $sourceItem->id;
-                    $lineData['unit_id'] = $sourceItem->billing_unit_id;
-                    $lineData['unit_label_snapshot'] = $sourceItem->billingUnit?->label;
-                } else {
-                    $lineData['billable_type'] = null;
-                    $lineData['billable_id'] = null;
-                    $lineData['unit_id'] = null;
-                    $lineData['unit_label_snapshot'] = null;
-                    $lineData['metadata']['item_type'] = 'service';
-                }
-
-                if ($patientId) {
-                    $pricing = $this->insurancePricing->resolveForItem(
-                        patientId: $patientId,
-                        itemType: 'service',
-                        externalCode: (string) $service->id,
-                        fallbackAmount: $gross,
-                    );
-                    $lineData['insurance_expected_amount'] = $pricing['insurer_amount'];
-                    $lineData['patient_responsibility_amount'] = $pricing['patient_amount'];
-                    $lineData['metadata'] = array_merge($lineData['metadata'], [
-                        'insurance_policy_id' => $pricing['policy_id'],
-                        'insurance_payer_id' => $pricing['payer_id'],
-                        'insurance_source_version' => $pricing['source_version'],
-                    ]);
-                }
-
-                InvoiceLine::query()->create($lineData);
-            }
-
-            $invoice = $this->totalsService->recalculate($invoice->fresh(['lines']));
-
-            $invoice = $this->issuanceService->issue($invoice->fresh(['lines']));
-
-            $invoiceTotal = (string) $invoice->total;
-
-            if ($amountTendered !== null && bccomp($amountTendered, $invoiceTotal, 2) < 0) {
+            if ($amountTendered !== null && bccomp($amountTendered, $grandTotal, 2) < 0) {
                 throw new \InvalidArgumentException('Amount tendered is less than the amount due.');
             }
-
-            $allocations = $this->allocationBuilder->allocateAmountAcrossUnpaidLines($invoice, $invoiceTotal);
 
             $paymentMetadata = [
                 'source' => 'pharmacy_pos',
@@ -228,32 +269,66 @@ class PharmacyPosCheckoutService
             ];
             if ($amountTendered !== null) {
                 $paymentMetadata['amount_tendered'] = $amountTendered;
-                $paymentMetadata['change_due'] = bcsub($amountTendered, $invoiceTotal, 2);
+                $paymentMetadata['change_due'] = bcsub($amountTendered, $grandTotal, 2);
             }
 
-            $payment = $this->paymentRecordingService->record(
-                allocations: $allocations,
-                method: $method,
-                gateway: $method->value,
-                currency: $currency,
-                patientId: $patientId,
-                branchId: $branchId,
-                recordedBy: auth()->id(),
-                metadata: $paymentMetadata,
-            );
-
-            foreach ($medRows as $row) {
-                $this->stockProvider->decrement(
+            // Ordered items are paid on the invoices they already sit on, so the order's
+            // payment status and any financial hold clear the same way as at the billing desk.
+            $settledPayments = $chargeLineIds !== []
+                ? $this->pendingCharges->settle(
+                    lineIds: $chargeLineIds,
+                    patientId: (string) $patientId,
                     branchId: $branchId,
-                    itemId: $row['id'],
-                    quantity: (int) $row['quantity'],
-                    reason: 'pos_sale',
+                    method: $method,
+                    currency: $currency,
+                    recordedBy: auth()->id(),
+                    metadata: $paymentMetadata + ['settled_pending_charges' => true],
+                )
+                : collect();
+
+            $payment = null;
+
+            if ($invoice !== null) {
+                $allocations = $this->allocationBuilder->allocateAmountAcrossUnpaidLines($invoice, $invoiceTotal);
+
+                $payment = $this->paymentRecordingService->record(
+                    allocations: $allocations,
+                    method: $method,
+                    gateway: $method->value,
+                    currency: $currency,
+                    patientId: $patientId,
+                    branchId: $branchId,
+                    recordedBy: auth()->id(),
+                    metadata: $paymentMetadata,
                 );
+
+                foreach ($medRows as $row) {
+                    $this->stockProvider->decrement(
+                        branchId: $branchId,
+                        itemId: $row['id'],
+                        quantity: (int) $row['quantity'],
+                        reason: 'pos_sale',
+                    );
+                }
             }
+
+            $payments = $settledPayments->values();
+            if ($payment !== null) {
+                $payments->prepend($payment);
+            }
+
+            $settledInvoices = $settledPayments
+                ->flatMap(fn ($settled) => $settled->fresh(['allocations.invoiceLine.invoice'])->allocations->map(fn ($allocation) => $allocation->invoiceLine?->invoice))
+                ->filter()
+                ->unique('id')
+                ->values();
 
             return [
-                'invoice' => $invoice->fresh(['lines']),
-                'payment' => $payment->fresh(['allocations']),
+                'invoice' => $invoice?->fresh(['lines']) ?? $settledInvoices->first(),
+                'payment' => $payments->first()?->fresh(['allocations']),
+                'invoices' => $invoice !== null ? $settledInvoices->prepend($invoice->fresh(['lines'])) : $settledInvoices,
+                'payments' => $payments,
+                'grand_total' => $grandTotal,
             ];
         });
     }
@@ -270,10 +345,15 @@ class PharmacyPosCheckoutService
         $patientId = $data['patient_id'] ?? null;
 
         $currency = $data['currency'] ?? config('core.default_currency');
-        $cart = $data['cart'];
+        // Ordered items are already on the patient's account; only walk-in rows are posted.
+        [, $cart] = self::splitChargeRows($data['cart']);
         $posDiscount = PharmacyPosTotals::normalizeMoney($data['pos_discount_amount'] ?? 0);
 
         Branch::query()->findOrFail($branchId);
+
+        if ($cart === []) {
+            throw new \InvalidArgumentException('The ordered items in the cart are already on the patient\'s account. Use "Pay now" to collect payment for them.');
+        }
 
         $medRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'medication');
         $svcRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'service');

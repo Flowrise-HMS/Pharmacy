@@ -101,6 +101,59 @@
                 @endif
             </div>
 
+            @if($selectedPatientId && $this->pendingCharges->isNotEmpty())
+                <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Pending charges') }}</h3>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">
+                                {{ __('Ordered items this patient still owes for. Add them to the cart and choose "Pay now" to settle the existing bill.') }}
+                            </p>
+                        </div>
+                        <x-filament::button size="xs" color="warning" wire:click="addAllPendingCharges">
+                            {{ __('Add all') }}
+                        </x-filament::button>
+                    </div>
+                    <div class="divide-y divide-amber-200/70 dark:divide-amber-800/60">
+                        @foreach($this->pendingCharges as $charge)
+                            @php $inCart = $cart->has('c'.$charge['invoice_line_id']); @endphp
+                            <div class="flex items-center justify-between gap-3 py-2">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        {{ $charge['name'] }}
+                                        @if($charge['quantity'] > 1)
+                                            <span class="text-xs text-gray-500">x{{ $charge['quantity'] }}</span>
+                                        @endif
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $charge['invoice_number'] ?? __('Draft bill') }}
+                                        @if(in_array($charge['order_status'] ?? null, ['completed', 'cancelled'], true))
+                                            &middot; <span class="text-gray-600 dark:text-gray-300">{{ __('Service done, still unpaid') }}</span>
+                                        @elseif($charge['requires_payment_before'])
+                                            &middot; <span class="text-amber-700 dark:text-amber-400">{{ __('Payment required before service') }}</span>
+                                        @else
+                                            &middot; <span class="text-gray-600 dark:text-gray-300">{{ __('Ordered, unpaid') }}</span>
+                                        @endif
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-3 flex-shrink-0">
+                                    <span class="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {{ config('core.default_currency') }} {{ number_format((float) $charge['remaining'], 2) }}
+                                    </span>
+                                    @if($inCart)
+                                        <span class="text-xs text-green-700 dark:text-green-400">{{ __('In cart') }}</span>
+                                    @else
+                                        <x-filament::button size="xs" color="gray" wire:click="addChargeToCart('{{ $charge['invoice_line_id'] }}')">
+                                            {{ __('Add') }}
+                                        </x-filament::button>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             @if($selectedPatientId && $selectedBranchId)
                 @livewire(\Modules\Pharmacy\Livewire\PatientPrescriptionsTable::class, [
                     'patientId' => $selectedPatientId,
@@ -157,7 +210,20 @@
                             <div class="flex-1 min-w-0">
                                 <p class="font-medium text-sm text-gray-900 dark:text-white truncate">
                                     {{ $item['name'] }}
+                                    @if(($item['type'] ?? 'medication') === 'charge')
+                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                                            {{ __('Ordered') }}
+                                        </span>
+                                    @endif
                                 </p>
+                                @if(($item['type'] ?? 'medication') === 'charge')
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        {{ __('Balance on :invoice', ['invoice' => $item['invoice_number'] ?? __('draft bill')]) }}
+                                        @if(($item['ordered_quantity'] ?? 1) > 1)
+                                            &middot; x{{ $item['ordered_quantity'] }}
+                                        @endif
+                                    </p>
+                                @else
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                     {{ config('core.default_currency') }} {{ number_format($item['price'], 2) }}
                                     @if(!empty($item['unit_label']))
@@ -182,6 +248,7 @@
                                         +
                                     </button>
                                 </div>
+                                @endif
                             </div>
                             <div class="text-right flex-shrink-0">
                                 <p class="font-semibold text-sm text-gray-900 dark:text-white">
@@ -234,8 +301,10 @@
                         <label class="flex items-center gap-1.5 text-sm cursor-pointer">
                             <input type="radio" wire:model.live="chargeMode" value="charge_account"
                                 class="text-primary-600 focus:ring-primary-500"
-                                @disabled($cart->isEmpty()) />
-                            <span class="text-gray-700 ms-3 dark:text-gray-300">{{ __('Post to account') }}</span>
+                                @disabled($cart->isEmpty() || $this->hasOnlyPendingChargeRows()) />
+                            <span class="text-gray-700 ms-3 dark:text-gray-300">
+                                {{ $this->hasOnlyPendingChargeRows() ? __('Already on account') : __('Post to account') }}
+                            </span>
                         </label>
                     </div>
 

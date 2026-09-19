@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
+use Livewire\Attributes\Computed;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
@@ -34,6 +35,9 @@ use Modules\Pharmacy\Classes\Support\PharmacyPosTotals;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
 
+/**
+ * @property-read Collection<int, array<string, mixed>> $pendingCharges
+ */
 class PharmacyPos extends Page implements HasActions, HasTable
 {
     use HasPageShield;
@@ -202,6 +206,141 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->patientSearch = '';
         $this->patientResults = collect();
         $this->saveCartToCache();
+    }
+
+    /**
+     * Ordered services and prescriptions the selected patient still owes for. Paying them
+     * here settles the existing invoice line, so the order is released without a second
+     * trip to the billing desk.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function pendingCharges(): Collection
+    {
+        if (! $this->selectedPatientId || ! ModuleAvailability::billingEnabled()) {
+            return collect();
+        }
+
+        $serviceClass = OptionalClass::resolve('Modules\\Billing\\Services\\PatientPendingChargesService', 'Billing');
+
+        if ($serviceClass === null) {
+            return collect();
+        }
+
+        return app($serviceClass)->rowsForPatient((string) $this->selectedPatientId, $this->selectedBranchId);
+    }
+
+    public function addChargeToCart(string $invoiceLineId): void
+    {
+        $charge = $this->pendingCharges->firstWhere('invoice_line_id', $invoiceLineId);
+
+        if ($charge === null) {
+            Notification::make()
+                ->warning()
+                ->title(__('Charge no longer pending'))
+                ->send();
+
+            unset($this->pendingCharges);
+
+            return;
+        }
+
+        $this->putChargeInCart($charge);
+        $this->calculateGrandTotal();
+        $this->saveCartToCache();
+    }
+
+    public function addAllPendingCharges(): void
+    {
+        foreach ($this->pendingCharges as $charge) {
+            $this->putChargeInCart($charge);
+        }
+
+        $this->calculateGrandTotal();
+        $this->saveCartToCache();
+    }
+
+    /**
+     * @param  array<string, mixed>  $charge
+     */
+    protected function putChargeInCart(array $charge): void
+    {
+        $key = 'c'.$charge['invoice_line_id'];
+
+        if ($this->cart->has($key)) {
+            return;
+        }
+
+        if ($this->chargeMode !== 'pay_now' && $this->canCreatePayment()) {
+            $this->chargeMode = 'pay_now';
+        }
+
+        $this->cart[$key] = [
+            'type' => 'charge',
+            'id' => $charge['invoice_line_id'],
+            'invoice_line_id' => $charge['invoice_line_id'],
+            'invoice_id' => $charge['invoice_id'],
+            'invoice_number' => $charge['invoice_number'],
+            'request_item_id' => $charge['request_item_id'],
+            'service_id' => $charge['service_id'],
+            'name' => $charge['name'],
+            'ordered_quantity' => $charge['quantity'],
+            'price' => (float) $charge['remaining'],
+            'quantity' => 1,
+            'unit_label' => '',
+        ];
+    }
+
+    /**
+     * A cashier adding a service the patient was already ordered almost always means
+     * "collect for that order", so link it instead of billing it twice.
+     */
+    protected function linkPendingChargeForService(?string $serviceId): bool
+    {
+        if (! $this->selectedPatientId || blank($serviceId)) {
+            return false;
+        }
+
+        $matches = $this->pendingCharges
+            ->where('service_id', $serviceId)
+            ->reject(fn (array $charge): bool => $this->cart->has('c'.$charge['invoice_line_id']))
+            ->values();
+
+        if ($matches->count() !== 1) {
+            return false;
+        }
+
+        $this->putChargeInCart($matches->first());
+
+        Notification::make()
+            ->info()
+            ->title(__('Linked to existing order'))
+            ->body(__(':name was already ordered for this patient; paying now settles that order.', ['name' => $matches->first()['name']]))
+            ->send();
+
+        return true;
+    }
+
+    /**
+     * @return array{0: string, 1: string} [walk-in subtotal, pending charges subtotal]
+     */
+    protected function cartSubtotals(): array
+    {
+        $walkIn = $this->cart->reject(fn (array $item): bool => ($item['type'] ?? 'medication') === 'charge');
+        $charges = $this->cart->filter(fn (array $item): bool => ($item['type'] ?? 'medication') === 'charge');
+
+        return [PharmacyPosTotals::cartSubtotal($walkIn), PharmacyPosTotals::cartSubtotal($charges)];
+    }
+
+    public function hasPendingChargeRows(): bool
+    {
+        return $this->cart->contains(fn (array $item): bool => ($item['type'] ?? 'medication') === 'charge');
+    }
+
+    public function hasOnlyPendingChargeRows(): bool
+    {
+        return $this->cart->isNotEmpty() && ! $this->cart->contains(fn (array $item): bool => ($item['type'] ?? 'medication') !== 'charge');
     }
 
     public function table(Table $table): Table
@@ -466,6 +605,13 @@ class PharmacyPos extends Page implements HasActions, HasTable
             ->with(['service', 'billingUnit', 'stockItems' => fn ($q) => $q->where('branch_id', $this->selectedBranchId)])
             ->findOrFail($medicationId);
 
+        if ($this->linkPendingChargeForService($medication->service?->id)) {
+            $this->calculateGrandTotal();
+            $this->saveCartToCache();
+
+            return;
+        }
+
         $stockQty = $medication->stockItems->sum('quantity_on_hand');
 
         if ($stockQty <= 0) {
@@ -518,6 +664,13 @@ class PharmacyPos extends Page implements HasActions, HasTable
             ->with(['category', 'billingUnit'])
             ->findOrFail($serviceId);
 
+        if ($this->linkPendingChargeForService($service->id)) {
+            $this->calculateGrandTotal();
+            $this->saveCartToCache();
+
+            return;
+        }
+
         $key = 's'.$service->id;
 
         if ($this->cart->has($key)) {
@@ -548,6 +701,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
         $quantity = max(1, (int) $quantity);
         $item = $this->cart->get($id);
+
+        if (($item['type'] ?? 'medication') === 'charge') {
+            return;
+        }
 
         if (($item['type'] ?? 'medication') === 'medication') {
             $stockQty = StockItem::query()
@@ -665,13 +822,15 @@ class PharmacyPos extends Page implements HasActions, HasTable
             }
         }
 
-        $subtotal = PharmacyPosTotals::cartSubtotal($this->cart);
+        [$walkInSubtotal] = $this->cartSubtotals();
         $discountStr = PharmacyPosTotals::normalizeMoney($this->discount);
-        if (bccomp($discountStr, $subtotal, 2) > 0) {
+        if (bccomp($discountStr, $walkInSubtotal, 2) > 0) {
             Notification::make()
                 ->danger()
                 ->title(__('Invalid discount'))
-                ->body(__('Discount cannot exceed the cart subtotal.'))
+                ->body($this->hasPendingChargeRows()
+                    ? __('Discounts apply to walk-in items only and cannot exceed their subtotal.')
+                    : __('Discount cannot exceed the cart subtotal.'))
                 ->send();
 
             return;
@@ -708,6 +867,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
                     'type' => $item['type'] ?? 'medication',
                     'id' => $item['id'],
                     'quantity' => $item['quantity'],
+                    'invoice_line_id' => $item['invoice_line_id'] ?? null,
                 ])->values()->toArray(),
                 'payment_method' => OptionalClass::when(
                     'Modules\\Billing\\Enums\\PaymentMethod',
@@ -718,11 +878,17 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 'amount_tendered' => $amountTendered,
             ]);
 
-            $this->lastInvoiceNumber = $result['invoice']->invoice_number;
+            $this->lastInvoiceNumber = $result['invoice']?->invoice_number;
+
+            $invoiceNumbers = collect($result['invoices'] ?? [$result['invoice']])
+                ->filter()
+                ->map(fn ($invoice) => $invoice->invoice_number)
+                ->unique()
+                ->implode(', ');
 
             Notification::make()
                 ->title(__('Checkout successful'))
-                ->body(__('Invoice:').' '.$result['invoice']->invoice_number)
+                ->body(__('Paid:').' '.$invoiceNumbers)
                 ->success()
                 ->duration(10000)
                 ->send();
@@ -730,7 +896,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
             if ($this->autoPrintReceipt) {
                 $receiptUrl = isset($result['payment'])
                     ? $this->buildReceiptUrl($result['payment']->id)
-                    : $this->buildInvoiceUrl($result['invoice']->id);
+                    : ($result['invoice'] ? $this->buildInvoiceUrl($result['invoice']->id) : null);
                 if ($receiptUrl) {
                     $this->dispatch('pos-open-receipt', url: $receiptUrl);
                 }
@@ -753,6 +919,16 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->danger()
                 ->title(__('Billing is unavailable'))
                 ->body(__('Enable the Billing module to charge a patient account.'))
+                ->send();
+
+            return;
+        }
+
+        if ($this->hasOnlyPendingChargeRows()) {
+            Notification::make()
+                ->warning()
+                ->title(__('Already on account'))
+                ->body(__('These ordered items are already on the patient\'s account. Choose "Pay now" to collect payment for them.'))
                 ->send();
 
             return;
@@ -859,6 +1035,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
             'payment_method' => $this->paymentMethod,
             'selected_patient_id' => $this->selectedPatientId,
             'auto_print_receipt' => $this->autoPrintReceipt,
+            'charge_mode' => $this->chargeMode,
         ], now()->addHours(1));
     }
 
@@ -881,6 +1058,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
             $this->paymentMethod = $cached['payment_method'] ?? $this->defaultPaymentMethodValue();
             $this->selectedPatientId = $cached['selected_patient_id'] ?? null;
             $this->autoPrintReceipt = $cached['auto_print_receipt'] ?? false;
+
+            if (in_array($cached['charge_mode'] ?? null, ['pay_now', 'charge_account'], true)) {
+                $this->chargeMode = $cached['charge_mode'];
+            }
         }
 
         if (! $this->cart instanceof Collection) {
