@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\ServiceCategoryCode;
+use Modules\Core\Enums\SidebarGroup;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
@@ -46,7 +47,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     protected static string $layout = 'filament-panels::components.layout.base';
 
-    protected static ?int $navigationSort = -2;
+    protected static ?int $navigationSort = 50;
 
     protected Width|string|null $maxContentWidth = 'full';
 
@@ -55,6 +56,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
     protected static ?string $navigationLabel = 'Point of Sale';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-cart';
+
+    protected static string|\UnitEnum|null $navigationGroup = SidebarGroup::Workspaces;
 
     protected string $view = 'pharmacy::filament.clusters.pharmacy.pages.pharmacy-pos';
 
