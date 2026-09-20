@@ -12,6 +12,7 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Context;
 use Modules\Core\Support\SuperAdmin;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\StockMovements\StockMovementResource;
@@ -22,6 +23,7 @@ class StockMovementsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['medication.service', 'medication.stockUnit', 'branch']))
             ->columns([
                 TextColumn::make('#')->rowIndex(),
                 TextColumn::make('created_at')

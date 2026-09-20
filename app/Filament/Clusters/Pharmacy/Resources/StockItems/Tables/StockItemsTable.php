@@ -11,6 +11,7 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Contracts\PharmacyStockItemTableActionsContract;
 use Modules\Pharmacy\Models\Medication;
 
@@ -21,6 +22,7 @@ class StockItemsTable
         $optionalActions = app(PharmacyStockItemTableActionsContract::class)->recordActions();
 
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['medication.stockUnit', 'branch']))
             ->columns([
                 TextColumn::make('#')->rowIndex(),
                 TextColumn::make('medication')

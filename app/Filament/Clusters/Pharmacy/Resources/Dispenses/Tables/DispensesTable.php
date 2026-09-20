@@ -7,6 +7,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Support\SuperAdmin;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Resources\Dispenses\DispenseResource;
 use Modules\Pharmacy\Models\Dispense;
@@ -16,6 +17,7 @@ class DispensesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['branch', 'medication', 'unit', 'dispensedBy', 'requestItem.serviceRequest']))
             ->columns([
                 TextColumn::make('branch.name')->label(__('Branch'))->searchable()->sortable()->toggleable(),
                 TextColumn::make('requestItem.serviceRequest.request_number')->label('Request #')->searchable(),
