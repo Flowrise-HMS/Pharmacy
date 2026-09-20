@@ -433,6 +433,11 @@ class PharmacyPos extends Page implements HasActions, HasTable
             ->with('category');
     }
 
+    public function blocksControlledSubstances(): bool
+    {
+        return app_settings($this->selectedBranchId)->pharmacyBlocksControlledOnPos();
+    }
+
     protected function medicationsTableQuery(): Builder
     {
         $query = Medication::query()->where('is_active', true);
@@ -442,6 +447,9 @@ class PharmacyPos extends Page implements HasActions, HasTable
         }
 
         return $query
+            // "Block controlled substances on POS": controlled medications
+            // are dispensed only against a prescription, never sold over the counter.
+            ->when($this->blocksControlledSubstances(), fn (Builder $q) => $q->whereNull('controlled_schedule'))
             ->whereHas('stockItems', fn ($q) => $q
                 ->where('branch_id', $this->selectedBranchId)
                 ->where('quantity_on_hand', '>', 0))
@@ -607,6 +615,16 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $medication = Medication::query()
             ->with(['service', 'billingUnit', 'stockItems' => fn ($q) => $q->where('branch_id', $this->selectedBranchId)])
             ->findOrFail($medicationId);
+
+        if ($medication->controlled_schedule !== null && $this->blocksControlledSubstances()) {
+            Notification::make()
+                ->danger()
+                ->title(__('Controlled substance'))
+                ->body(($medication->service?->name ?? $medication->generic_name).' '.__('can only be dispensed against a prescription.'))
+                ->send();
+
+            return;
+        }
 
         if ($this->linkPendingChargeForService($medication->service?->id)) {
             $this->calculateGrandTotal();
@@ -889,20 +907,32 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->unique()
                 ->implode(', ');
 
-            Notification::make()
+            $receiptUrl = isset($result['payment'])
+                ? $this->buildReceiptUrl($result['payment']->id)
+                : ($result['invoice'] ? $this->buildInvoiceUrl($result['invoice']->id) : null);
+
+            $notification = Notification::make()
                 ->title(__('Checkout successful'))
                 ->body(__('Paid:').' '.$invoiceNumbers)
                 ->success()
-                ->duration(10000)
-                ->send();
+                ->duration(10000);
 
-            if ($this->autoPrintReceipt) {
-                $receiptUrl = isset($result['payment'])
-                    ? $this->buildReceiptUrl($result['payment']->id)
-                    : ($result['invoice'] ? $this->buildInvoiceUrl($result['invoice']->id) : null);
-                if ($receiptUrl) {
-                    $this->dispatch('pos-open-receipt', url: $receiptUrl);
-                }
+            // A "Print receipt" button always works because it is a user click;
+            // the auto-print below is best-effort (popup blockers may stop it).
+            if ($receiptUrl) {
+                $notification->actions([
+                    Action::make('print_receipt')
+                        ->label(__('Print receipt'))
+                        ->button()
+                        ->url($receiptUrl)
+                        ->openUrlInNewTab(),
+                ]);
+            }
+
+            $notification->send();
+
+            if ($this->autoPrintReceipt && $receiptUrl) {
+                $this->dispatch('pos-open-receipt', url: $receiptUrl);
             }
 
             $this->resetState();
@@ -980,13 +1010,24 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ]);
             }
 
+            $invoiceUrl = $this->buildInvoiceUrl($invoice->id);
+
+            if ($invoiceUrl) {
+                $notification->actions([
+                    ...$notification->getActions(),
+                    Action::make('print_invoice')
+                        ->label(__('Print invoice'))
+                        ->button()
+                        ->color('gray')
+                        ->url($invoiceUrl)
+                        ->openUrlInNewTab(),
+                ]);
+            }
+
             $notification->send();
 
-            if ($this->autoPrintReceipt) {
-                $invoiceUrl = $this->buildInvoiceUrl($invoice->id);
-                if ($invoiceUrl) {
-                    $this->dispatch('pos-open-receipt', url: $invoiceUrl);
-                }
+            if ($this->autoPrintReceipt && $invoiceUrl) {
+                $this->dispatch('pos-open-receipt', url: $invoiceUrl);
             }
 
             $this->resetState();

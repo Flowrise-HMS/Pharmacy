@@ -37,7 +37,7 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
         }
 
         if (in_array($frequency, [MedicationFrequency::STAT, MedicationFrequency::ONCE], true)) {
-            $statDuration = (int) config('clinical.mar_schedule.stat_duration_days', 1);
+            $statDuration = (int) app_settings()->clinicalValue('mar_stat_duration_days', config('clinical.mar_schedule.stat_duration_days', 1));
 
             return [
                 'total_administrations' => 1,
@@ -133,7 +133,7 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
      */
     protected function defaultTimesForFrequency(?MedicationFrequency $frequency): array
     {
-        $configured = config('clinical.mar_default_times', []);
+        $configured = app_settings()->clinicalValue('mar_default_times', config('clinical.mar_default_times', []));
 
         return match ($frequency) {
             MedicationFrequency::QD => $configured['qd'] ?? ['08:00'],

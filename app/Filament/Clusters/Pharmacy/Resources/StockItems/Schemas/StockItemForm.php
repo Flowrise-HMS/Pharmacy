@@ -37,7 +37,7 @@ class StockItemForm
                 TextInput::make('reorder_point')
                     ->numeric()
                     ->required()
-                    ->default(1)
+                    ->default(fn (): int => app_settings()->pharmacyDefaultReorderPoint())
                     ->minValue(0)
                     ->suffix(fn (?StockItem $record): string => $record?->medication?->stockUnit?->label ?? ''),
             ]);

@@ -62,7 +62,7 @@ class DrugMaterializationService
             ],
             [
                 'quantity_on_hand' => 0,
-                'reorder_point' => (int) Arr::get($data, 'reorder_point', 10),
+                'reorder_point' => (int) Arr::get($data, 'reorder_point', app_settings()->pharmacyDefaultReorderPoint()),
             ]
         )->increment('quantity_on_hand', $quantity);
     }

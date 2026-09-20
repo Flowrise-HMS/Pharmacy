@@ -86,7 +86,7 @@ class MedicationsTable
                             ],
                             [
                                 'quantity_on_hand' => 0,
-                                'reorder_point' => 10,
+                                'reorder_point' => app_settings()->pharmacyDefaultReorderPoint(),
                             ]
                         )->increment('quantity_on_hand', (int) $data['quantity']);
 

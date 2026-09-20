@@ -96,7 +96,7 @@ class MedicationImporter extends Importer
                 'branch_id' => $data['branch_id'],
             ], [
                 'quantity_on_hand' => 0, // initial creation
-                'reorder_point' => 10,
+                'reorder_point' => app_settings()->pharmacyDefaultReorderPoint(),
                 'reorder_quantity' => 50,
             ])->increment('quantity_on_hand', (int) $data['initial_stock_quantity']);
         }

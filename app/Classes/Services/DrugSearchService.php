@@ -211,7 +211,7 @@ class DrugSearchService
             'generic_name' => $medication->generic_name,
             'brand_name' => $medication->brand_name,
             'strength_text' => $medication->strength,
-            'dosage_form_text' => $medication->dosage_form?->value ?? (string) $medication->dosage_form,
+            'dosage_form_text' => enum_string($medication->dosage_form) ?? '',
             'rxnorm_code' => $medication->rxnorm_code,
             'ndc_code' => $medication->ndc_code,
             'is_cached_external' => false,

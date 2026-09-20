@@ -373,11 +373,39 @@
     </div>
     <x-filament-actions::modals />
 <script>
+    // Auto-print: load the PDF in a hidden iframe and print it from there.
+    // window.open() from a Livewire response is not a user gesture and is
+    // silently blocked by popup blockers; a same-origin iframe is not.
     window.addEventListener('pos-open-receipt', function (event) {
         var url = event.detail && event.detail.url;
-        if (url) {
-            window.open(url, '_blank', 'noopener');
+        if (! url) {
+            return;
         }
+
+        var existing = document.getElementById('pos-print-frame');
+        if (existing) {
+            existing.remove();
+        }
+
+        var frame = document.createElement('iframe');
+        frame.id = 'pos-print-frame';
+        frame.style.position = 'fixed';
+        frame.style.right = '0';
+        frame.style.bottom = '0';
+        frame.style.width = '0';
+        frame.style.height = '0';
+        frame.style.border = '0';
+        frame.setAttribute('aria-hidden', 'true');
+        frame.onload = function () {
+            try {
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+            } catch (error) {
+                window.open(url, '_blank', 'noopener');
+            }
+        };
+        frame.src = url;
+        document.body.appendChild(frame);
     });
 </script>
 </x-filament-panels::page>

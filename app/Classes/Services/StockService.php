@@ -80,7 +80,7 @@ class StockService implements StockProviderContract
         DB::transaction(function () use ($branchId, $itemId, $quantity, $reason, $referenceType, $referenceId): void {
             $stock = StockItem::query()->firstOrCreate(
                 ['branch_id' => $branchId, 'medication_id' => $itemId],
-                ['quantity_on_hand' => 0, 'reorder_point' => 0]
+                ['quantity_on_hand' => 0, 'reorder_point' => app_settings()->pharmacyDefaultReorderPoint()]
             );
 
             StockItem::query()

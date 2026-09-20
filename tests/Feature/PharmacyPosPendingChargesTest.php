@@ -20,9 +20,12 @@ use Modules\Core\Models\Branch;
 use Modules\Core\Models\Service;
 use Modules\Patient\Models\Patient;
 use Modules\Pharmacy\Classes\Services\PharmacyPosCheckoutService;
+use Modules\Pharmacy\Classes\Services\StockService;
+use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\Pages\PharmacyPos;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\StockItem;
+use Modules\Pharmacy\Settings\PharmacySettings;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -291,4 +294,65 @@ it('pays pending charges from the point of sale page', function (): void {
     expect($line->fresh()->line_status)->toBe(InvoiceLineStatus::Paid)
         ->and($item->fresh()->payment_status)->toBe(InvoiceLineStatus::Paid)
         ->and($item->fresh()->hasActiveFinancialHold())->toBeFalse();
+});
+
+it('offers a print receipt button and auto-prints only when the checkbox is on', function (): void {
+    Gate::before(fn (): bool => true);
+
+    [, $line] = orderedService(80);
+
+    Livewire::test(PharmacyPos::class)
+        ->call('selectPatient', $this->patient->id)
+        ->call('addChargeToCart', (string) $line->id)
+        ->set('chargeMode', 'pay_now')
+        ->set('paymentMethod', 'cash')
+        ->set('autoPrintReceipt', false)
+        ->call('checkout')
+        ->assertNotified('Checkout successful')
+        ->assertNotDispatched('pos-open-receipt');
+
+    [, $secondLine] = orderedService(20, 'Urinalysis');
+
+    Livewire::test(PharmacyPos::class)
+        ->call('selectPatient', $this->patient->id)
+        ->call('addChargeToCart', (string) $secondLine->id)
+        ->set('chargeMode', 'pay_now')
+        ->set('paymentMethod', 'cash')
+        ->set('autoPrintReceipt', true)
+        ->call('checkout')
+        ->assertNotified('Checkout successful')
+        ->assertDispatched('pos-open-receipt');
+});
+
+it('keeps controlled substances off the point of sale when the setting is on', function (): void {
+    Gate::before(fn (): bool => true);
+    PharmacySettings::fake(['block_controlled_on_pos' => true]);
+
+    $medication = walkInMedication(30);
+    $medication->update(['controlled_schedule' => ControlledSchedule::SCHEDULE_2]);
+
+    $page = Livewire::test(PharmacyPos::class)
+        ->call('addToCart', $medication->id)
+        ->assertNotified('Controlled substance');
+
+    expect(collect($page->get('cart')))->toBeEmpty()
+        ->and($page->instance()->blocksControlledSubstances())->toBeTrue();
+
+    PharmacySettings::fake(['block_controlled_on_pos' => false]);
+
+    $page = Livewire::test(PharmacyPos::class)
+        ->call('addToCart', $medication->id);
+
+    expect(collect($page->get('cart')))->not->toBeEmpty();
+});
+
+it('uses the configured default reorder point for new stock items', function (): void {
+    PharmacySettings::fake(['default_reorder_point' => 25]);
+
+    $medication = walkInMedication(30);
+    StockItem::query()->where('medication_id', $medication->id)->delete();
+
+    app(StockService::class)->increment($this->branch->id, $medication->id, 5, 'test');
+
+    expect(StockItem::query()->where('medication_id', $medication->id)->value('reorder_point'))->toBe(25);
 });

@@ -226,7 +226,7 @@ class MedicationMergeService
             $medication->generic_name,
             $medication->brand_name,
             $medication->strength,
-            $medication->dosage_form?->value ?? (string) $medication->dosage_form,
+            enum_string($medication->dosage_form) ?? '',
         ];
 
         $normalized = collect($parts)
