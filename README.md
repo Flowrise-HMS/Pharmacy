@@ -61,7 +61,7 @@ flowchart LR
 | `app/Filament/` | `PharmacyPlugin`; `PharmacyCluster` (Patient Care group) with resources Medications, Drugs, Stock Items, Stock Movements, Dispenses and pages Pharmacy report, Pharmacy settings; the top-level `PharmacyPos` page (Workspaces group); `Concerns/HandlesPosPrescriptionFulfillmentActions`; importers (`MedicationImporter`, `DrugImporter`), exporters (`MedicationExporter`, `DispenseExporter`); report widgets and dashboard widgets. `app/Livewire/PatientPrescriptionsTable` is the prescription table embedded in the POS. |
 | `app/Enums/` | `ControlledSchedule`, `DosageForm`, `MedicationFrequency`, `MedicationRoute`, `AdministrationContext`, `DispenseFulfillmentType`, `StockMovementReason`. |
 | `app/Console/` | `fda-ndc:import`, `pharmacy:backfill-medication-services`, `pharmacy:backfill-medication-units`, `pharmacy:backfill-prescription-details`, `pharmacy:merge-duplicate-medications`. No scheduled tasks. |
-| `app/Settings/PharmacySettings.php` | POS defaults (pay-now allowed, default charge mode, payment methods, guest checkout, services tab), RxNorm lookup toggle; "Block controlled substances on POS" (POS catalog + cart guard) and "Default reorder point" (seeds every new stock item). |
+| `app/Settings/PharmacySettings.php` | POS defaults (checkout mode: cashier chooses / pay now only / send to billing only, payment methods, guest checkout, services tab), RxNorm lookup toggle; "Block controlled substances on POS" (POS catalog + cart guard) and "Default reorder point" (seeds every new stock item). |
 | `app/Exceptions/` | Domain-specific pharmacy errors. |
 | `app/Providers/` | Module boot/register logic and route/event providers. |
 | `database/migrations/` | 19 migrations. |

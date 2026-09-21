@@ -11,6 +11,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Modules\Core\Enums\NavigationGroup;
+use Modules\Core\Enums\PosCheckoutMode;
 use Modules\Pharmacy\Filament\Clusters\Pharmacy\PharmacyCluster;
 use Modules\Pharmacy\Settings\PharmacySettings;
 
@@ -37,16 +38,12 @@ class ManagePharmacySettings extends SettingsPage
                 Section::make(__('Point of Sale'))
                     ->columns(2)
                     ->schema([
-                        Toggle::make('pos_collect_payment')
-                            ->label(__('Allow pay-now at POS (global default)'))
-                            ->helperText(__('Organization/branch settings can override this.')),
-                        Select::make('pos_default_charge_mode')
-                            ->label(__('Default charge mode'))
-                            ->options([
-                                'charge_account' => __('Send to billing'),
-                                'pay_now' => __('Pay now'),
-                            ])
-                            ->required(),
+                        Select::make('pos_checkout_mode')
+                            ->label(__('POS checkout mode (global default)'))
+                            ->options(PosCheckoutMode::options())
+                            ->required()
+                            ->helperText(PosCheckoutMode::helpText().' '.__('Organization and branch settings on the Application page can override this.'))
+                            ->columnSpanFull(),
                         CheckboxList::make('pos_payment_methods')
                             ->label(__('Enabled payment methods'))
                             ->options([

@@ -289,23 +289,30 @@
                         </span>
                     </div>
 
+                    @php($allowedModes = $this->allowedChargeModes())
                     <div class="flex items-center gap-4 pt-1">
-                        @if($this->canCreatePayment())
+                        @if (count($allowedModes) > 1)
                             <label class="flex items-center gap-1.5 text-sm cursor-pointer">
                                 <input type="radio" wire:model.live="chargeMode" value="pay_now"
                                     class="text-primary-600 focus:ring-primary-500"
                                     @disabled($cart->isEmpty()) />
                                 <span class="text-gray-700 ms-3 dark:text-gray-300">{{ __('Pay now') }}</span>
                             </label>
+                            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <input type="radio" wire:model.live="chargeMode" value="charge_account"
+                                    class="text-primary-600 focus:ring-primary-500"
+                                    @disabled($cart->isEmpty() || $this->hasOnlyPendingChargeRows()) />
+                                <span class="text-gray-700 ms-3 dark:text-gray-300">
+                                    {{ $this->hasOnlyPendingChargeRows() ? __('Already on account') : __('Post to account') }}
+                                </span>
+                            </label>
+                        @elseif ($allowedModes === ['pay_now'])
+                            <span class="text-sm text-gray-600 dark:text-gray-400">{{ __('Payment is collected at the point of sale') }}</span>
+                        @elseif ($allowedModes === ['charge_account'])
+                            <span class="text-sm text-gray-600 dark:text-gray-400">{{ __('Payments are collected at the Billing Desk') }}</span>
+                        @else
+                            <span class="text-sm text-danger-600 dark:text-danger-400">{{ __('You are not permitted to collect payments at this point of sale. Ask an administrator.') }}</span>
                         @endif
-                        <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-                            <input type="radio" wire:model.live="chargeMode" value="charge_account"
-                                class="text-primary-600 focus:ring-primary-500"
-                                @disabled($cart->isEmpty() || $this->hasOnlyPendingChargeRows()) />
-                            <span class="text-gray-700 ms-3 dark:text-gray-300">
-                                {{ $this->hasOnlyPendingChargeRows() ? __('Already on account') : __('Post to account') }}
-                            </span>
-                        </label>
                     </div>
 
                     @if ($chargeMode === 'pay_now')
@@ -358,7 +365,7 @@
                     <button type="button" wire:click="checkout"
                         class="w-full px-4 py-3 text-sm font-bold dark:text-white rounded-lg transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed
                             {{ $chargeMode === 'pay_now' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700' }}"
-                        @disabled($cart->isEmpty())>
+                        @disabled($cart->isEmpty() || $allowedModes === [])>
                         @if ($chargeMode === 'pay_now')
                             <x-heroicon-m-currency-dollar class="w-5 h-5" />
                             {{ __('Dispense & Checkout') }}

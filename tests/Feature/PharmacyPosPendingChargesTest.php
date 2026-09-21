@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
@@ -8,6 +10,7 @@ use Livewire\Livewire;
 use Modules\Billing\Enums\InvoiceLineStatus;
 use Modules\Billing\Enums\InvoiceStatus;
 use Modules\Billing\Enums\PaymentMethod;
+use Modules\Billing\Filament\Clusters\Billing\Pages\BillingDesk;
 use Modules\Billing\Models\Invoice;
 use Modules\Billing\Models\InvoiceLine;
 use Modules\Billing\Models\Payment;
@@ -40,7 +43,7 @@ beforeEach(function (): void {
     $settings->financial_hold_enabled = true;
     $settings->save();
 
-    $this->branch = Branch::factory()->default()->create(['is_active' => true, 'pharmacy_pos_collect_payment' => true]);
+    $this->branch = Branch::factory()->default()->create(['is_active' => true, 'pos_checkout_mode' => 'cashier_chooses']);
     $this->patient = Patient::withoutEvents(fn (): Patient => Patient::factory()->create(['branch_id' => $this->branch->id]));
     $this->encounter = EncounterFactory::new()->create(['patient_id' => $this->patient->id, 'branch_id' => $this->branch->id]);
 
@@ -219,6 +222,29 @@ it('ignores charge rows when posting to account and refuses an empty posting', f
             ['type' => 'charge', 'id' => $line->id, 'quantity' => 1, 'invoice_line_id' => $line->id],
         ],
     ]))->toThrow(InvalidArgumentException::class, 'already on the patient');
+});
+
+it('points the cashier to pay now or the billing desk when only ordered items are in the cart', function (): void {
+    Gate::before(fn (): bool => true);
+
+    [, $line] = orderedService(80);
+
+    Livewire::test(PharmacyPos::class)
+        ->call('selectPatient', $this->patient->id)
+        ->call('addChargeToCart', (string) $line->id)
+        ->call('checkoutChargeToAccount')
+        ->assertNotified(
+            Notification::make()
+                ->warning()
+                ->title(__('Already on account'))
+                ->body(__('These ordered items are already on the patient\'s account. Choose "Pay now" to collect payment here, or go to the Billing Desk page to settle them.'))
+                ->actions([
+                    Action::make('open_billing_desk')
+                        ->label(__('Go to Billing Desk'))
+                        ->button()
+                        ->url(BillingDesk::getUrl()),
+                ]),
+        );
 });
 
 it('lists pending charges for the selected patient and links them into the cart', function (): void {

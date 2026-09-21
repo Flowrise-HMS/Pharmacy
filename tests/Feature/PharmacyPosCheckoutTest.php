@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Billing\Enums\InvoiceStatus;
 use Modules\Billing\Enums\PaymentMethod;
 use Modules\Core\Enums\BillingType;
+use Modules\Core\Enums\PosCheckoutMode;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Organization;
 use Modules\Core\Models\Service;
@@ -382,13 +383,13 @@ class PharmacyPosCheckoutTest extends TestCase
         $this->actingAs($user);
 
         $organization = Organization::factory()->create([
-            'pharmacy_pos_collect_payment' => true,
+            'pos_checkout_mode' => 'cashier_chooses',
         ]);
 
         $branch = Branch::factory()->create([
             'organization_id' => $organization->id,
             'is_active' => true,
-            'pharmacy_pos_collect_payment' => false,
+            'pos_checkout_mode' => 'charge_account',
         ]);
 
         $category = $this->medicationServiceCategory();
@@ -411,6 +412,7 @@ class PharmacyPosCheckoutTest extends TestCase
         ]);
 
         $settings = AppSettings::forBranch($branch->id);
+        $this->assertSame(PosCheckoutMode::ChargeAccount, $settings->pharmacyPosCheckoutMode());
         $this->assertFalse($settings->pharmacyPosCollectPaymentEnabled());
 
         $result = app(PharmacyPosCheckoutService::class)->checkoutChargeToAccount([

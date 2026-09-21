@@ -6,9 +6,11 @@ use Spatie\LaravelSettings\Settings;
 
 class PharmacySettings extends Settings
 {
-    public bool $pos_collect_payment = true;
-
-    public string $pos_default_charge_mode = 'charge_account';
+    /**
+     * cashier_chooses | pay_now | charge_account (see Modules\Core\Enums\PosCheckoutMode).
+     * Organization and branch settings can override it.
+     */
+    public string $pos_checkout_mode = 'cashier_chooses';
 
     /** @var array<int, string> */
     public array $pos_payment_methods = ['cash', 'card', 'bank_transfer', 'mobile_money'];

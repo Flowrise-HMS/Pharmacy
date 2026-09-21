@@ -352,7 +352,7 @@ class PharmacyPosCheckoutService
         Branch::query()->findOrFail($branchId);
 
         if ($cart === []) {
-            throw new \InvalidArgumentException('The ordered items in the cart are already on the patient\'s account. Use "Pay now" to collect payment for them.');
+            throw new \InvalidArgumentException('The ordered items in the cart are already on the patient\'s account. Choose "Pay now" to collect payment, or settle them on the Billing Desk page.');
         }
 
         $medRows = array_filter($cart, fn ($r) => ($r['type'] ?? 'medication') === 'medication');

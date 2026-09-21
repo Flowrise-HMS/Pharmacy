@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
 use Modules\Core\Classes\Services\BranchService;
+use Modules\Core\Enums\PosCheckoutMode;
 use Modules\Core\Enums\ServiceCategoryCode;
 use Modules\Core\Enums\SidebarGroup;
 use Modules\Core\Filament\Tables\Columns\CurrencyColumn;
@@ -99,6 +100,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public string $chargeMode = 'charge_account';
 
+    protected ?PosCheckoutMode $resolvedCheckoutMode = null;
+
     public string $activeTab = 'medications';
 
     public function mount(): void
@@ -111,8 +114,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->activeTab = Session::get('pharmacy_pos_active_tab', 'medications');
         $this->selectedBranchId = $this->resolveDefaultBranchId();
         $this->cartCacheKey = 'pharmacy_pos_user_'.Auth::id().'_branch_'.($this->selectedBranchId ?? 'default');
-        $this->chargeMode = app_settings($this->selectedBranchId)->pharmacyPosDefaultChargeMode();
+        $this->chargeMode = $this->defaultChargeMode();
         $this->restoreCartFromCache();
+        // A cached choice from an earlier session only survives if it is still allowed here.
+        $this->chargeMode = $this->normalizeChargeMode($this->chargeMode);
         if (! $this->showGuestCheckout()) {
             $this->guestName = null;
             $this->guestPhone = null;
@@ -147,10 +152,8 @@ class PharmacyPos extends Page implements HasActions, HasTable
     {
         $this->cartCacheKey = 'pharmacy_pos_user_'.Auth::id().'_branch_'.($value ?? 'default');
         $this->cart = collect();
-        $this->chargeMode = app_settings($value)->pharmacyPosDefaultChargeMode();
-        if (! $this->canCreatePayment() && $this->chargeMode === 'pay_now') {
-            $this->chargeMode = 'charge_account';
-        }
+        $this->resolvedCheckoutMode = null;
+        $this->chargeMode = $this->defaultChargeMode();
         if (! $this->showGuestCheckout()) {
             $this->guestName = null;
             $this->guestPhone = null;
@@ -169,6 +172,16 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public function updatedChargeMode($value): void
     {
+        if (! $this->chargeModeAllowed()) {
+            $this->chargeMode = $this->defaultChargeMode();
+
+            Notification::make()
+                ->warning()
+                ->title(__('Checkout mode not available'))
+                ->body(__('This checkout mode is not available at this branch.'))
+                ->send();
+        }
+
         $this->saveCartToCache();
     }
 
@@ -873,6 +886,18 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
+        if (! $this->chargeModeAllowed()) {
+            $this->chargeMode = $this->defaultChargeMode();
+
+            Notification::make()
+                ->danger()
+                ->title(__('Checkout mode not available'))
+                ->body(__('This checkout mode is not available at this branch. Choose another option and try again.'))
+                ->send();
+
+            return;
+        }
+
         if (! $this->selectedPatientId) {
             if (! $this->showGuestCheckout()) {
                 Notification::make()
@@ -1009,12 +1034,38 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
-        if ($this->hasOnlyPendingChargeRows()) {
+        if (! $this->checkoutMode()->allowsChargeAccount()) {
             Notification::make()
+                ->danger()
+                ->title(__('Send to billing is not available'))
+                ->body(__('Sales at this branch must be paid for at the point of sale.'))
+                ->send();
+
+            return;
+        }
+
+        if ($this->hasOnlyPendingChargeRows()) {
+            $billingDeskUrl = OptionalClass::when(
+                'Modules\\Billing\\Filament\\Clusters\\Billing\\Pages\\BillingDesk',
+                fn (string $page) => $page::getUrl(),
+                'Billing',
+            );
+
+            $notification = Notification::make()
                 ->warning()
                 ->title(__('Already on account'))
-                ->body(__('These ordered items are already on the patient\'s account. Choose "Pay now" to collect payment for them.'))
-                ->send();
+                ->body(__('These ordered items are already on the patient\'s account. Choose "Pay now" to collect payment here, or go to the Billing Desk page to settle them.'));
+
+            if (is_string($billingDeskUrl) && $billingDeskUrl !== '') {
+                $notification->actions([
+                    Action::make('open_billing_desk')
+                        ->label(__('Go to Billing Desk'))
+                        ->button()
+                        ->url($billingDeskUrl),
+                ]);
+            }
+
+            $notification->send();
 
             return;
         }
@@ -1110,6 +1161,7 @@ class PharmacyPos extends Page implements HasActions, HasTable
         $this->amountPaid = null;
         $this->change = 0;
         $this->paymentMethod = $this->defaultPaymentMethodValue();
+        $this->chargeMode = $this->defaultChargeMode();
         $this->clearCartCache();
     }
 
@@ -1202,13 +1254,70 @@ class PharmacyPos extends Page implements HasActions, HasTable
         }
     }
 
+    /**
+     * The checkout mode configured for the selected branch (branch override,
+     * organization default, then the global Pharmacy setting).
+     */
+    public function checkoutMode(): PosCheckoutMode
+    {
+        return $this->resolvedCheckoutMode ??= app_settings($this->selectedBranchId)->pharmacyPosCheckoutMode();
+    }
+
+    /**
+     * Charge modes the cashier may use here: pay now needs the mode to allow
+     * it and the user to be able to record payments; send to billing needs
+     * the mode to allow it.
+     *
+     * @return list<string>
+     */
+    public function allowedChargeModes(): array
+    {
+        $modes = [];
+
+        if ($this->canCreatePayment()) {
+            $modes[] = 'pay_now';
+        }
+
+        if ($this->checkoutMode()->allowsChargeAccount()) {
+            $modes[] = 'charge_account';
+        }
+
+        return $modes;
+    }
+
+    public function chargeModeAllowed(): bool
+    {
+        return in_array($this->chargeMode, $this->allowedChargeModes(), true);
+    }
+
+    protected function defaultChargeMode(): string
+    {
+        return $this->normalizeChargeMode($this->checkoutMode()->defaultChargeMode($this->canCreatePayment()));
+    }
+
+    /**
+     * Keep the given mode when it is allowed, otherwise fall back to the first
+     * allowed one (send to billing when nothing is allowed, so the button can
+     * be disabled rather than silently taking money).
+     */
+    protected function normalizeChargeMode(?string $mode): string
+    {
+        $allowed = $this->allowedChargeModes();
+
+        if ($mode !== null && in_array($mode, $allowed, true)) {
+            return $mode;
+        }
+
+        return $allowed[0] ?? 'charge_account';
+    }
+
     public function canCreatePayment(): bool
     {
         if (! ModuleAvailability::billingEnabled()) {
             return false;
         }
 
-        if (! app_settings($this->selectedBranchId)->pharmacyPosCollectPaymentEnabled()) {
+        if (! $this->checkoutMode()->allowsPayNow()) {
             return false;
         }
 
