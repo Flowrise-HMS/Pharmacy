@@ -31,8 +31,12 @@ class MedicationObserver
 
         $changed = false;
 
-        if ((bool) $service->is_active !== (bool) $medication->is_active) {
-            $service->is_active = $medication->is_active;
+        // A medication created without an explicit flag has is_active === null
+        // in memory until refreshed (the column defaults to true).
+        $medicationIsActive = (bool) ($medication->is_active ?? true);
+
+        if ((bool) $service->is_active !== $medicationIsActive) {
+            $service->is_active = $medicationIsActive;
             $changed = true;
         }
 

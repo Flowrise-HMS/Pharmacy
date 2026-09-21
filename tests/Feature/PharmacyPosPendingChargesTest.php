@@ -346,6 +346,33 @@ it('keeps controlled substances off the point of sale when the setting is on', f
     expect(collect($page->get('cart')))->not->toBeEmpty();
 });
 
+it('refuses checkout of a controlled substance added before the block was switched on', function (): void {
+    Gate::before(fn (): bool => true);
+    PharmacySettings::fake(['block_controlled_on_pos' => false]);
+
+    $medication = walkInMedication(30);
+    $medication->update(['controlled_schedule' => ControlledSchedule::SCHEDULE_2]);
+
+    $page = Livewire::test(PharmacyPos::class)
+        ->call('addToCart', $medication->id);
+
+    expect(collect($page->get('cart')))->not->toBeEmpty();
+
+    PharmacySettings::fake(['block_controlled_on_pos' => true]);
+    $invoiceCount = Invoice::query()->withoutGlobalScopes()->count();
+
+    $page
+        ->call('selectPatient', $this->patient->id)
+        ->set('chargeMode', 'pay_now')
+        ->set('paymentMethod', 'cash')
+        ->call('checkout')
+        ->assertNotified('Controlled substance')
+        ->assertNotNotified('Checkout successful');
+
+    expect(Invoice::query()->withoutGlobalScopes()->count())->toBe($invoiceCount)
+        ->and(collect($page->get('cart')))->not->toBeEmpty();
+});
+
 it('uses the configured default reorder point for new stock items', function (): void {
     PharmacySettings::fake(['default_reorder_point' => 25]);
 

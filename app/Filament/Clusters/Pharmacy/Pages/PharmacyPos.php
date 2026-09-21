@@ -346,6 +346,54 @@ class PharmacyPos extends Page implements HasActions, HasTable
         return $this->cart->isNotEmpty() && ! $this->cart->contains(fn (array $item): bool => ($item['type'] ?? 'medication') !== 'charge');
     }
 
+    /**
+     * Walk-in controlled-substance lines that predate the "block controlled on
+     * POS" setting being switched on. Prescription charges are unaffected.
+     *
+     * @return list<string>
+     */
+    public function blockedControlledCartItems(): array
+    {
+        if (! $this->blocksControlledSubstances()) {
+            return [];
+        }
+
+        $medicationIds = $this->cart
+            ->filter(fn (array $item): bool => ($item['type'] ?? 'medication') === 'medication')
+            ->pluck('id')
+            ->filter()
+            ->values();
+
+        if ($medicationIds->isEmpty()) {
+            return [];
+        }
+
+        return Medication::query()
+            ->whereIn('id', $medicationIds)
+            ->whereNotNull('controlled_schedule')
+            ->with('service')
+            ->get()
+            ->map(fn (Medication $medication): string => $medication->service?->name ?? $medication->generic_name)
+            ->all();
+    }
+
+    protected function refuseBlockedControlledCheckout(): bool
+    {
+        $blocked = $this->blockedControlledCartItems();
+
+        if ($blocked === []) {
+            return false;
+        }
+
+        Notification::make()
+            ->danger()
+            ->title(__('Controlled substance'))
+            ->body(implode(', ', $blocked).' '.__('can only be dispensed against a prescription. Remove the item from the cart to continue.'))
+            ->send();
+
+        return true;
+    }
+
     public function table(Table $table): Table
     {
         if ($this->activeTab === 'services') {
@@ -821,6 +869,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
             return;
         }
 
+        if ($this->refuseBlockedControlledCheckout()) {
+            return;
+        }
+
         if (! $this->selectedPatientId) {
             if (! $this->showGuestCheckout()) {
                 Notification::make()
@@ -964,6 +1016,10 @@ class PharmacyPos extends Page implements HasActions, HasTable
                 ->body(__('These ordered items are already on the patient\'s account. Choose "Pay now" to collect payment for them.'))
                 ->send();
 
+            return;
+        }
+
+        if ($this->refuseBlockedControlledCheckout()) {
             return;
         }
 

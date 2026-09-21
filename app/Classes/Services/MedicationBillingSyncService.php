@@ -54,6 +54,7 @@ final class MedicationBillingSyncService
         ]);
 
         $medicationData['service_id'] = $service->id;
+        $medicationData['is_active'] = (bool) Arr::get($medicationData, 'is_active', true);
 
         return Medication::query()->create(Arr::only($medicationData, (new Medication)->getFillable()));
     }
