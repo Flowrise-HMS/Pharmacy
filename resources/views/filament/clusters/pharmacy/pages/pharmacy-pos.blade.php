@@ -40,27 +40,34 @@
                     </select>
                 </div>
 
-                <div class="relative">
+                <div class="relative" x-data="{ picking: null }">
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('Patient') }}</label>
                     <x-filament::input.wrapper>
                         <x-filament::input
                             type="text"
                             placeholder="{{ __('Search by name, MRN, phone, email…') }}"
                             wire:model.live.debounce.300ms="patientSearch"
+                            x-on:input="picking = null"
                             prefix-icon="heroicon-m-user"
                         />
                     </x-filament::input.wrapper>
 
                     @if($patientResults->isNotEmpty())
-                        <div class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        <div x-show="! picking" class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                             @foreach($patientResults as $result)
                                 <button type="button" wire:click="selectPatient('{{ $result['id'] }}')"
+                                    x-on:click="picking = @js($result['label'])"
                                     class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition">
                                     {{ $result['label'] }}
                                 </button>
                             @endforeach
                         </div>
                     @endif
+
+                    <div wire:loading.flex wire:target="selectPatient" class="mt-1 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <x-filament::loading-indicator class="h-4 w-4" />
+                        <span x-text="picking ? @js(__('Loading')) + ' ' + picking + '…' : @js(__('Loading…'))"></span>
+                    </div>
 
                     @if($selectedPatientId)
                         @php
