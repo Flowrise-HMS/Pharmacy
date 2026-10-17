@@ -119,7 +119,7 @@
     </div>
 
     @if ($this->getFooterWidgets())
-        <div class="grid gap-4 md:grid-cols-2 mt-6">
+        <div class="mt-6">
             <x-filament-widgets::widgets
                 :widgets="$this->getFooterWidgets()"
                 :columns="['md' => 2, 'xl' => 2]"
@@ -128,7 +128,7 @@
     @endif
 
     @if ($this->getReportTableWidgets())
-        <div class="grid gap-4 mt-6">
+        <div class="mt-6">
             <x-filament-widgets::widgets
                 :widgets="$this->getReportTableWidgets()"
                 :columns="1"
