@@ -3,6 +3,7 @@
 namespace Modules\Pharmacy\Classes\Services;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Modules\Clinical\Classes\Services\MedicationDoseScheduleService;
@@ -213,7 +214,10 @@ class MedicationOrderService
             $administerInFacility,
         );
 
-        $courseStartedAt = $encounter?->admitted_at ?? now();
+        $courseStartedAt = ! empty($itemData['course_started_at'])
+            ? Carbon::parse($itemData['course_started_at'])
+            : (! empty($itemData['start_time']) ? Carbon::parse($itemData['start_time']) : ($encounter?->admitted_at ?? now()));
+
         $schedule = $this->scheduleCalculator->compute([
             'frequency' => $itemData['frequency'] ?? 'qd',
             'duration_days' => $itemData['duration_days'] ?? 1,
@@ -240,6 +244,8 @@ class MedicationOrderService
             'course_end_at' => $schedule['course_end_at'],
             'max_administrations' => $itemData['max_administrations'] ?? null,
             'administer_in_facility_flag' => $administerInFacility,
+            'schedule_type' => $itemData['schedule_type'] ?? 'interval_based',
+            'custom_dose_times' => $itemData['custom_dose_times'] ?? null,
         ]);
 
         // The item was hydrated before its detail existed; attach it so the
@@ -329,7 +335,9 @@ class MedicationOrderService
     public function previewSchedule(array $itemData, ?Encounter $encounter = null): array
     {
         $itemData = $this->normalizePrnAndFrequency($itemData);
-        $courseStartedAt = $encounter?->admitted_at ?? now();
+        $courseStartedAt = ! empty($itemData['course_started_at'])
+            ? Carbon::parse($itemData['course_started_at'])
+            : (! empty($itemData['start_time']) ? Carbon::parse($itemData['start_time']) : ($encounter?->admitted_at ?? now()));
 
         return $this->scheduleCalculator->compute([
             'frequency' => $itemData['frequency'] ?? 'qd',

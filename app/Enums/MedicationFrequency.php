@@ -24,10 +24,10 @@ enum MedicationFrequency: string implements HasColor, HasDescription, HasLabel
     public function getLabel(): string|Htmlable|null
     {
         return match ($this) {
-            self::QD => 'Once Daily (QD)',
-            self::BID => 'Twice Daily (BID)',
-            self::TID => 'Three Times Daily (TID)',
-            self::QID => 'Four Times Daily (QID)',
+            self::QD => 'Once Daily (OD / QD)',
+            self::BID => 'Twice Daily (BD / BID)',
+            self::TID => 'Three Times Daily (TDS / TID)',
+            self::QID => 'Four Times Daily (QDS / QID)',
             self::Q4H => 'Every 4 Hours (Q4H)',
             self::Q6H => 'Every 6 Hours (Q6H)',
             self::Q8H => 'Every 8 Hours (Q8H)',
@@ -100,8 +100,24 @@ enum MedicationFrequency: string implements HasColor, HasDescription, HasLabel
         };
     }
 
+    public function intervalHours(): ?int
+    {
+        return match ($this) {
+            self::QD => 24,
+            self::BID => 12,
+            self::TID => 8,
+            self::QID => 6,
+            self::Q4H => 4,
+            self::Q6H => 6,
+            self::Q8H => 8,
+            self::Q12H => 12,
+            default => null,
+        };
+    }
+
     public function isIntervalBased(): bool
     {
         return $this->hoursInterval() !== null;
     }
 }
+

@@ -52,10 +52,15 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
         $freqLabel = $frequency?->getLabel()
             ?? (is_string($input['frequency'] ?? null) ? (string) $input['frequency'] : 'Unknown');
 
+        $intervalHours = $frequency?->intervalHours();
+        $courseEndAt = $intervalHours !== null
+            ? $courseStartedAt->copy()->addHours($intervalHours * $totalAdministrations)
+            : $courseStartedAt->copy()->addDays($durationDays);
+
         return [
             'total_administrations' => $totalAdministrations,
             'course_started_at' => $courseStartedAt,
-            'course_end_at' => $courseStartedAt->copy()->addDays($durationDays),
+            'course_end_at' => $courseEndAt,
             'schedule_summary' => "{$freqLabel} × {$durationDays} day(s) = {$totalAdministrations} doses",
         ];
     }
@@ -65,15 +70,12 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
      */
     public function buildDoseSchedule(object $detail): array
     {
-        if (! $detail instanceof PrescriptionDetail) {
-            return [];
-        }
-
-        $frequency = $this->normalizeFrequency($detail->frequency);
+        $frequency = $this->normalizeFrequency($detail->frequency ?? null);
         $courseStartedAt = Carbon::parse($detail->course_started_at ?? now());
         $durationDays = max(1, (int) ($detail->duration_days ?? 1));
+        $isPrn = filter_var($detail->prn ?? false, FILTER_VALIDATE_BOOLEAN) || $frequency === MedicationFrequency::PRN;
 
-        if ($detail->prn || $frequency === MedicationFrequency::PRN) {
+        if ($isPrn) {
             return [];
         }
 
@@ -81,9 +83,104 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
             return [new DoseSlot(1, $courseStartedAt->copy())];
         }
 
-        if ($frequency?->isIntervalBased()) {
-            $intervalHours = $frequency->hoursInterval();
-            $total = $detail->total_administrations ?? ($frequency->timesPerDay() * $durationDays);
+        $scheduleType = $detail->schedule_type ?? null;
+        $customDoseTimes = is_array($detail->custom_dose_times ?? null)
+            ? $detail->custom_dose_times
+            : (is_string($detail->custom_dose_times ?? null) ? json_decode($detail->custom_dose_times, true) : null);
+
+        // Custom daily times strategy
+        if ($scheduleType === 'custom_times' && ! empty($customDoseTimes)) {
+            $times = array_values(array_filter(array_map(function ($time): string {
+                return is_array($time) ? (string) ($time['time'] ?? '') : (string) $time;
+            }, (array) $customDoseTimes)));
+            sort($times);
+            $slots = [];
+            $sequence = 1;
+
+            for ($day = 0; $day < $durationDays; $day++) {
+                foreach ($times as $time) {
+                    if (! str_contains($time, ':')) {
+                        continue;
+                    }
+
+                    [$hour, $minute] = array_map('intval', explode(':', $time));
+                    $dueAt = $courseStartedAt->copy()->startOfDay()->addDays($day)->setTime($hour, $minute);
+
+                    if ($day === 0 && $dueAt->lt($courseStartedAt)) {
+                        $dueAt = $courseStartedAt->copy();
+                    }
+
+                    $slots[] = new DoseSlot($sequence++, $dueAt);
+                }
+            }
+
+            if (! empty($detail->total_administrations)) {
+                $slots = array_slice($slots, 0, (int) $detail->total_administrations);
+                foreach ($slots as $index => $slot) {
+                    $slots[$index] = new DoseSlot($index + 1, $slot->dueAt);
+                }
+            }
+
+            return $slots;
+        }
+
+        // Automated interval strategy (explicit interval_based customization)
+        if ($scheduleType === 'interval_based') {
+            $intervalHours = $frequency?->intervalHours() ?? $frequency?->hoursInterval();
+
+            if ($intervalHours !== null) {
+                $total = ! empty($detail->total_administrations)
+                    ? (int) $detail->total_administrations
+                    : (($frequency?->timesPerDay() ?? 1) * $durationDays);
+                $slots = [];
+
+                for ($i = 0; $i < $total; $i++) {
+                    $slots[] = new DoseSlot(
+                        $i + 1,
+                        $courseStartedAt->copy()->addHours($intervalHours * $i)
+                    );
+                }
+
+                return $slots;
+            }
+        }
+
+        // Standard ward times strategy (or default for non-interval frequencies without custom schedule)
+        if ($scheduleType === 'standard_times' || ($scheduleType === null && ! ($frequency?->isIntervalBased() ?? false))) {
+            $defaultTimes = $this->defaultTimesForFrequency($frequency);
+            $slots = [];
+            $sequence = 1;
+
+            for ($day = 0; $day < $durationDays; $day++) {
+                foreach ($defaultTimes as $time) {
+                    [$hour, $minute] = array_map('intval', explode(':', $time));
+                    $dueAt = $courseStartedAt->copy()->startOfDay()->addDays($day)->setTime($hour, $minute);
+
+                    if ($day === 0 && $dueAt->lt($courseStartedAt)) {
+                        $dueAt = $courseStartedAt->copy();
+                    }
+
+                    $slots[] = new DoseSlot($sequence++, $dueAt);
+                }
+            }
+
+            if (! empty($detail->total_administrations)) {
+                $slots = array_slice($slots, 0, (int) $detail->total_administrations);
+                foreach ($slots as $index => $slot) {
+                    $slots[$index] = new DoseSlot($index + 1, $slot->dueAt);
+                }
+            }
+
+            return $slots;
+        }
+
+        // Interval-based frequency fallback (Q4H, Q6H, Q8H, Q12H)
+        $intervalHours = $frequency?->intervalHours() ?? $frequency?->hoursInterval();
+
+        if ($intervalHours !== null) {
+            $total = ! empty($detail->total_administrations)
+                ? (int) $detail->total_administrations
+                : (($frequency?->timesPerDay() ?? 1) * $durationDays);
             $slots = [];
 
             for ($i = 0; $i < $total; $i++) {
@@ -96,6 +193,7 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
             return $slots;
         }
 
+        // Fallback to standard times if no interval can be determined
         $defaultTimes = $this->defaultTimesForFrequency($frequency);
         $slots = [];
         $sequence = 1;
@@ -113,8 +211,8 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
             }
         }
 
-        if ($detail->total_administrations) {
-            $slots = array_slice($slots, 0, $detail->total_administrations);
+        if (! empty($detail->total_administrations)) {
+            $slots = array_slice($slots, 0, (int) $detail->total_administrations);
             foreach ($slots as $index => $slot) {
                 $slots[$index] = new DoseSlot($index + 1, $slot->dueAt);
             }
@@ -125,7 +223,24 @@ class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorCo
 
     protected function normalizeFrequency(MedicationFrequency|string|null $frequency): ?MedicationFrequency
     {
-        return enum_try_from(MedicationFrequency::class, $frequency);
+        if ($frequency instanceof MedicationFrequency) {
+            return $frequency;
+        }
+
+        if (is_string($frequency)) {
+            $normalized = strtolower(trim($frequency));
+            $aliased = match ($normalized) {
+                'od' => 'qd',
+                'bd' => 'bid',
+                'tds' => 'tid',
+                'qds' => 'qid',
+                default => $normalized,
+            };
+
+            return enum_try_from(MedicationFrequency::class, $aliased);
+        }
+
+        return null;
     }
 
     /**

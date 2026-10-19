@@ -35,6 +35,8 @@ class PrescriptionDetail extends Model
         'next_dose_at',
         'max_administrations',
         'administer_in_facility_flag',
+        'schedule_type',
+        'custom_dose_times',
     ];
 
     protected $casts = [
@@ -49,6 +51,7 @@ class PrescriptionDetail extends Model
         'course_end_at' => 'datetime',
         'next_dose_at' => 'datetime',
         'administer_in_facility_flag' => 'boolean',
+        'custom_dose_times' => 'array',
     ];
 
     public function requestItem(): BelongsTo
