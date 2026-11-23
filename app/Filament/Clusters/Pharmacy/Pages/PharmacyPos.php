@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Modules\Core\Classes\Services\BranchService;
 use Modules\Core\Enums\PosCheckoutMode;
 use Modules\Core\Enums\ServiceCategoryCode;
@@ -104,6 +105,34 @@ class PharmacyPos extends Page implements HasActions, HasTable
 
     public string $activeTab = 'medications';
 
+    /**
+     * Optional cart prefill from the URL (e.g. a website pharmacy order):
+     * `?prefill=<medicationId>:<qty>,...&patient=<patientId>`.
+     */
+    #[Url(as: 'prefill', keep: false)]
+    public ?string $prefill = null;
+
+    #[Url(as: 'patient', keep: false)]
+    public ?string $prefillPatientId = null;
+
+    /**
+     * POS URL that opens with the given lines (and patient) in the cart.
+     *
+     * @param  array<string, int>  $lines  medication id => quantity
+     */
+    public static function prefillUrl(array $lines, ?string $patientId = null): string
+    {
+        $prefill = collect($lines)
+            ->filter(fn ($quantity): bool => (int) $quantity > 0)
+            ->map(fn ($quantity, $medicationId): string => $medicationId.':'.(int) $quantity)
+            ->implode(',');
+
+        return static::getUrl(array_filter([
+            'prefill' => $prefill,
+            'patient' => $patientId,
+        ]));
+    }
+
     public function mount(): void
     {
         $this->cart = collect();
@@ -124,6 +153,44 @@ class PharmacyPos extends Page implements HasActions, HasTable
             $this->guestEmail = null;
         }
         $this->calculateGrandTotal();
+        $this->applyPrefill();
+    }
+
+    /**
+     * Replace the cart with the URL prefill. Each line goes through addToCart()/
+     * updateQuantity(), so stock limits and the controlled-substance block apply
+     * exactly as if the cashier had added it.
+     */
+    protected function applyPrefill(): void
+    {
+        if (blank($this->prefill)) {
+            return;
+        }
+
+        $this->cart = collect();
+
+        if (filled($this->prefillPatientId)) {
+            $this->selectPatient($this->prefillPatientId);
+        }
+
+        foreach (explode(',', (string) $this->prefill) as $line) {
+            [$medicationId, $quantity] = array_pad(explode(':', trim($line), 2), 2, '1');
+
+            if ($medicationId === '' || ! Medication::query()->whereKey($medicationId)->exists()) {
+                continue;
+            }
+
+            $this->addToCart($medicationId);
+
+            if ((int) $quantity > 1 && $this->cart->has('m'.$medicationId)) {
+                $this->updateQuantity('m'.$medicationId, (int) $quantity);
+            }
+        }
+
+        $this->prefill = null;
+        $this->prefillPatientId = null;
+        $this->calculateGrandTotal();
+        $this->saveCartToCache();
     }
 
     protected function resolveDefaultBranchId(): ?string

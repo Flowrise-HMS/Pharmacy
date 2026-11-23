@@ -42,6 +42,7 @@ flowchart LR
 - Place **medication orders** from the Clinical Workspace and fulfil them from the **Point of Sale** page (Workspaces group): dispense from stock, record outside purchases, print prescription slips.
 - Record **dispensing events** against clinical request items (in-house, outside purchase, supply only).
 - Run **Point of Sale** checkout for walk-in / guest or OTC sales, with "Pay now" (cash, card, bank transfer, mobile money) or "Send to Billing", discounts, receipts, and settling of pending charges.
+- Open the POS pre-filled from a link: `?prefill=<medicationId>:<qty>,...&patient=<patientId>` (build it with `PharmacyPos::prefillUrl()`); lines go through the normal add-to-cart checks (stock, controlled-substance block). The Website **Pharmacy Orders** inbox uses this for "Open in POS".
 - Review the **Pharmacy report** (sales, dispensing, MAR adherence, low stock) and dashboard widgets (operations stats, dispensing queue, low stock overview).
 - Enforce safety/business checks (for example insufficient stock exceptions, payment-before-dispense flags).
 
