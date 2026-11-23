@@ -244,7 +244,7 @@ class MedicationOrderService
             'course_end_at' => $schedule['course_end_at'],
             'max_administrations' => $itemData['max_administrations'] ?? null,
             'administer_in_facility_flag' => $administerInFacility,
-            'schedule_type' => $itemData['schedule_type'] ?? 'interval_based',
+            'schedule_type' => $itemData['schedule_type'] ?? app_settings()->marDefaultScheduleType(),
             'custom_dose_times' => $itemData['custom_dose_times'] ?? null,
         ]);
 
