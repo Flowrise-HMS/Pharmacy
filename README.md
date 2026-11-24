@@ -65,8 +65,8 @@ flowchart LR
 | `app/Settings/PharmacySettings.php` | POS defaults (checkout mode: cashier chooses / pay now only / send to billing only, payment methods, guest checkout, services tab), RxNorm lookup toggle; "Block controlled substances on POS" (POS catalog + cart guard) and "Default reorder point" (seeds every new stock item). |
 | `app/Exceptions/` | Domain-specific pharmacy errors. |
 | `app/Providers/` | Module boot/register logic and route/event providers. |
-| `database/migrations/` | 19 migrations. |
-| `routes/` | `GET /pharmacy/prescription-slip/{requestItem}` and `/pharmacy/prescription-slip/combined` (printable slips); REST `drugs` (index/show) and `dispenses` (index/show/update) when the Api module is enabled. |
+| `database/migrations/` | 20 migrations. |
+| `routes/` | `GET /pharmacy/prescription-slip/{requestItem}` and `/pharmacy/prescription-slip/combined` (printable slips); REST `drugs` (read), `medications` (CRUD), `dispenses` (read/update), `pharmacy-stock` (read), token scope `pharmacy`, when the Api module is enabled. |
 
 ## Dependencies
 
@@ -78,6 +78,7 @@ See [module status](../../docs/shared/module-status.md) for rollout state.
 
 ## Further reading
 
+- **Administration:** [Pharmacy Administration](../../docs/admin-guide/pharmacy.md)
 - **Staff-facing workflows:** [Pharmacy Workflows](../../docs/user-guide/pharmacy.md)
 - Project-level docs: [docs/README.md](../../docs/README.md)
 - Clinical workflows context: [docs/user-guide/clinical-workflows.md](../../docs/user-guide/clinical-workflows.md)
@@ -89,4 +90,4 @@ See [module status](../../docs/shared/module-status.md) for rollout state.
 - Boot-time relation extension: `RequestItem::resolveRelationUsing('dispenses', ...)`
 - Stock abstraction is bound via `StockProviderContract` -> `StockService`.
 - **Custom permissions:** `order_prescription_medication`, `administer_medication`, `dispense_medication`, `manage_pharmacy_settings`; page permission `View PharmacyPos`; widget permissions `View <Widget>`.
-- **Tests:** `php artisan test --compact Modules/Pharmacy/tests` (29 test files). Verified against code on 2026-09-20.
+- **Tests:** `php artisan test --compact Modules/Pharmacy/tests` (41 test files). Verified against code on 2026-11-24.
