@@ -104,4 +104,3 @@ it('builds dose slots with custom daily times', function (): void {
         ->and($slots[2]->dueAt->format('H:i'))->toBe('10:00')
         ->and($slots[3]->dueAt->format('H:i'))->toBe('22:00');
 });
-

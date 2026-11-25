@@ -6,7 +6,6 @@ use Carbon\Carbon;
 use Modules\Clinical\Contracts\PrescriptionScheduleCalculatorContract;
 use Modules\Pharmacy\Classes\Data\DoseSlot;
 use Modules\Pharmacy\Enums\MedicationFrequency;
-use Modules\Pharmacy\Models\PrescriptionDetail;
 
 class PrescriptionScheduleCalculator implements PrescriptionScheduleCalculatorContract
 {

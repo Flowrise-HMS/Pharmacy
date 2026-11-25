@@ -42,7 +42,9 @@ FilamentResourceTestSuite::register([
         'performed_by' => auth()->id(),
         ...$attributes,
     ]),
-    'makeRecords' => fn (TestCase $test, int $count) => StockMovement::factory()->count($count)->create([
+    'makeRecords' => fn (TestCase $test, int $count) => StockMovement::factory()->count($count)->sequence(
+        ['reason' => 'purchase'], ['reason' => 'sale'], ['reason' => 'adjustment'], ['reason' => 'expired'],
+    )->create([
         'branch_id' => $test->branch->id,
         'medication_id' => $test->medication->id,
         'performed_by' => auth()->id(),

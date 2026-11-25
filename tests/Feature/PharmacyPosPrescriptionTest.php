@@ -20,6 +20,7 @@ use Modules\Pharmacy\Classes\Services\PharmacyPosPrescriptionService;
 use Modules\Pharmacy\Enums\AdministrationContext;
 use Modules\Pharmacy\Enums\ControlledSchedule;
 use Modules\Pharmacy\Enums\DispenseFulfillmentType;
+use Modules\Pharmacy\Enums\MedicationFrequency;
 use Modules\Pharmacy\Exceptions\UnauthorizedMedicationOrderException;
 use Modules\Pharmacy\Models\Medication;
 use Modules\Pharmacy\Models\PrescriptionDetail;
@@ -109,7 +110,7 @@ class PharmacyPosPrescriptionTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('500mg');
-        $response->assertSee('Twice Daily (BID)');
+        $response->assertSee(MedicationFrequency::BID->getLabel());
         $response->assertSee('Obtain from licensed community pharmacy');
         $response->assertSee(__('Notes'));
         $response->assertSee('80mm');

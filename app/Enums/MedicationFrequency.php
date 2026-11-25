@@ -120,4 +120,3 @@ enum MedicationFrequency: string implements HasColor, HasDescription, HasLabel
         return $this->hoursInterval() !== null;
     }
 }
-
